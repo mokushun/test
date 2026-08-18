@@ -1,0 +1,158 @@
+@charset "UTF-8";
+body {
+	background: rgb(240,232,198);
+	margin: 0;
+	padding: 0;
+	line-height: 1.6;
+}
+#outer {
+	background-color: #fff;
+	margin: 0 auto;
+	width: 900px;
+}
+header {
+	padding: 20px 20px 10px 30px;
+	height: 100px;
+	background: linear-gradient(to bottom, #fcfaf0, #fff);
+}
+#content {
+	float: left;
+	width: 620px;
+}
+.inner {
+	margin: 0 10px;
+	padding: 10px 10px 20px 20px;
+}
+aside {
+	color: #676767;
+	font-size: 13px;
+	font-weight: normal;
+	width: 280px;
+	float: left;
+	padding: 17px 0 0 0;
+}
+.right-title {
+	font-size: 15px;
+	margin: 0 26px 0 0;
+	padding: 6px 10px 6px 20px;
+	font-weight: bold;
+	background-color: #C4F0EF;
+	color: #666;
+	border-top: 1px solid #ccc;
+	border-right: 1px solid #ccc;
+	border-left: 1px solid #ccc;
+}
+.link {
+	margin: 0 26px 15px 0;
+	padding: 16px 10px 10px 14px;
+	border: 1px solid #c7c7c7;
+}
+.link a {
+	font-weight: normal;
+	font-size: 14px;
+	color: #003366;
+	text-decoration: none;
+}
+.link a:hover {
+	text-decoration: underline;
+}
+ul {
+	margin: 0 0 0 1em;
+	padding: 0;
+}
+.link li {
+	list-style: none;
+	margin-bottom: 8px;
+}
+p {
+	margin: 1em 0;
+}
+img {
+	max-width: 100%;
+	height: auto;
+	border: 0;
+}
+hr {
+	border-width: 1px 0 0 0;
+	border-style: solid;
+	border-color: #ccc;
+	height: 1px;
+}
+a {
+	font-weight: normal;
+	color: #003366;
+}
+h1 {
+	font-size: 28px;
+	margin: 0;
+	padding: 10px 0 0 0;
+}
+h1 a {
+	font-weight: bold;
+	color: #000;
+	text-decoration: none;
+}
+h1 a:hover {
+	text-decoration: underline;
+}
+h2 {
+	font-size: 18px;
+	margin: 10px 0;
+	padding: 10px;
+	background-color: #E7F5FD;
+	border: 1px solid #C7DBE5;
+}
+h2 a {
+	font-weight: bold;
+	text-decoration: none;
+	color: #265699;
+}
+h3 {
+	font-size: 16px;
+	color: #000000;
+}
+h3 a {
+	text-decoration: none;
+	color: #265699;
+}
+footer {
+	color: #666;
+	font-size: 13px;
+	height: 100px;
+	clear: both;
+	text-align: center;
+}
+.pagetop {
+	padding-right: 35px;
+	text-align: right;
+}
+blockquote {
+	border: 1px solid #ccc;
+	padding: 5px;
+	margin: 10px;
+}
+@media screen and (max-width: 768px) {
+#outer {
+	width: 100%;
+}
+#content, aside {
+	float: none;
+	width: 100%;
+	padding: 0;
+}
+.inner {
+	margin: 0;
+	padding: 10px;
+}
+.right-title, .link {
+	margin: 0;
+}
+.right-title {
+	border-top: none;
+	border-right: none;
+	border-left: none;
+}
+.link {
+	border: none;
+}
+}
