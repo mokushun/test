@@ -64,7 +64,11 @@ async function loadAll() {
         box.appendChild(chartDiv);
         grid.appendChild(box);
         try {
-            const res = await fetch(symbol + "_" + tf + ".json");
+
+            const res = await fetch(
+                "https://x162-43-35-129.static.xvps.ne.jp/oanda_json/" +
+            symbol + "_" + tf + ".json"
+            );
             const data = await res.json();
             const chart = LightweightCharts.createChart(chartDiv, {
                 height: 260,
@@ -175,7 +179,9 @@ async function loadStrong() {
         grid.appendChild(box);
 
         try {
-            const res = await fetch(cfg.file);
+            const res = await fetch(
+              "https://x162-43-35-129.static.xvps.ne.jp/oanda_json/" + cfg.file
+            );
             const data = await res.json();
             const sliced = data.slice(-cfg.bars);
 
