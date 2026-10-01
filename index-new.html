@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FX Monitor</title>
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+:root { --bd:#ddd; --mut:#666; }
+body { font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif; margin: 10px; color: #222; }
+h1 { font-size: 18px; margin: 0 0 6px; }
+h2 { font-size: 15px; margin: 22px 0 8px; }
+#bar { padding: 6px 10px; border-radius: 4px; font-size: 13px; margin-bottom: 8px; background: #eef6ee; }
+#bar.bad { background: #fde8e8; color: #a00; font-weight: bold; }
+.tabs { margin-bottom: 8px; }
+.tabs button { padding: 4px 14px; border: 1px solid var(--bd); background: #fff; cursor: pointer; font-size: 13px; }
+.tabs button.on { background: #222; color: #fff; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+.box { border: 1px solid var(--bd); padding: 6px; border-radius: 4px; min-width: 0; }
+.ttl { font-weight: bold; font-size: 13px; display: flex; justify-content: space-between; margin-bottom: 4px; }
+.chart { height: 240px; }
+.legend span { font-size: 11px; font-weight: bold; margin-right: 8px; }
+.wrap { overflow-x: auto; margin-bottom: 10px; }
+table { border-collapse: collapse; font-size: 13px; width: 100%; }
+th, td { border-bottom: 1px solid var(--bd); padding: 4px 8px; text-align: left; white-space: nowrap; }
+.buy { color: #1a7f37; font-weight: bold; }
+.sell { color: #c62828; font-weight: bold; }
+.mut { color: var(--mut); font-size: 13px; }
+</style>
+</head>
+<body>
+<h1>FX Monitor</h1>
+<div id="bar">読み込み中…</div>
+
+<div class="tabs">
+  <button data-tf="H1" class="on">H1</button>
+  <button data-tf="D1">D1</button>
+</div>
+<div id="candles" class="grid"></div>
+
+<h2>Currency Strength</h2>
+<div id="strength" class="grid"></div>
+
+<section id="posSec" hidden>
+  <h2>Positions</h2>
+  <div id="positions"></div>
+</section>
+
+<script>
+// ---- 設定 ----
+const BASE = "https://x162-43-35-129.static.xvps.ne.jp/public/";   // update.py の出力を配信している場所
+const SYMBOLS = ["US100","JP225","US500","USDJPY","EURUSD","EURJPY",
+                 "USDCHF","AUDCHF","GBPCHF","GBPUSD","AUDUSD","CHFJPY"];
+const SHOW = { H1: 120, D1: 100 };       // 表示本数
+const STALE_MIN = 25;                    // これ以上更新が無ければ警告（分）
+const REFRESH_MS = 120000;               // 自動再取得の間隔
+const COLORS = { USD:"#2196F3", JPY:"#F44336", EUR:"#4CAF50", GBP:"#9C27B0", AUD:"#FF9800", CHF:"#795548" };
+const STRENGTH = [["short","Short (gen=0.98)"], ["mid","Mid (gen=0.996)"], ["long","Long (gen=0.999)"]];
+
+// ---- 共通 ----
+const JST = 9 * 3600;   // JSON の時刻は UTC 秒。表示は JST にずらす
+let tf = "H1", cs = {}, ss = {}, data = {};
+const $ = id => document.getElementById(id);
+const el = (tag, cls, text) => {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+};
+const fmt = t => new Date((t + JST) * 1000).toISOString().slice(5, 16).replace("T", " ");
+const day = t => new Date((t + JST) * 1000).toISOString().slice(0, 10);
+const get = async name => {
+  const r = await fetch(BASE + name, { cache: "no-cache" });
+  if (!r.ok) throw new Error(name + " " + r.status);
+  return r.json();
+};
+const baseOpts = timeVisible => ({
+  autoSize: true, handleScroll: false, handleScale: false,
+  layout: { background: { color: "#ffffff" }, textColor: "#000" },
+  grid: { vertLines: { visible: false }, horzLines: { color: "#f0f0f0" } },
+  rightPriceScale: { borderVisible: false },
+  timeScale: { borderVisible: false, timeVisible, rightOffset: 2 }
+});
+
+// ---- ローソク足 ----
+function candle(p) {
+  const d = { time: tf === "H1" ? p.t + JST : day(p.t), open: p.o, high: p.h, low: p.l, close: p.c };
+  if (p.cur) {   // 未確定の現在足は薄い色
+    const up = p.c >= p.o;
+    d.color = up ? "#b3d1ff" : "#ffc2c2";
+    d.borderColor = d.wickColor = up ? "#4a80d9" : "#d94a4a";
+  }
+  return d;
+}
+function buildCandles() {
+  Object.values(cs).forEach(c => c.chart.remove());
+  cs = {};
+  $("candles").replaceChildren();
+  for (const s of SYMBOLS) {
+    const box = el("div", "box"), ttl = el("div", "ttl");
+    const px = el("span");
+    ttl.append(el("span", null, s + " " + tf), px);
+    const div = el("div", "chart");
+    box.append(ttl, div);
+    $("candles").append(box);
+    const chart = LightweightCharts.createChart(div, baseOpts(tf === "H1"));
+    cs[s] = { chart, series: chart.addCandlestickSeries(), px };
+  }
+}
+function drawCandles() {
+  const d = data[tf];
+  if (!d) return;
+  for (const s of SYMBOLS) {
+    const arr = d.symbols[s];
+    if (!cs[s] || !arr || !arr.length) continue;
+    const pts = arr.slice(-SHOW[tf]);
+    cs[s].series.setData(pts.map(candle));
+    cs[s].chart.timeScale().fitContent();
+    cs[s].px.textContent = pts[pts.length - 1].c;
+  }
+}
+
+// ---- 通貨強弱 ----
+function buildStrength() {
+  const g = $("strength");
+  g.replaceChildren();
+  for (const [k, label] of STRENGTH) {
+    const box = el("div", "box");
+    box.append(el("div", "ttl", label));
+    const lg = el("div", "legend");
+    for (const c in COLORS) {
+      const sp = el("span", null, c);
+      sp.style.color = COLORS[c];
+      lg.append(sp);
+    }
+    const div = el("div", "chart");
+    box.append(lg, div);
+    g.append(box);
+    const chart = LightweightCharts.createChart(div, baseOpts(true));
+    const lines = {};
+    for (const c in COLORS) {
+      lines[c] = chart.addLineSeries({ color: COLORS[c], lineWidth: 1, priceLineVisible: false,
+                                       lastValueVisible: false, crosshairMarkerVisible: false });
+    }
+    ss[k] = { chart, lines };
+  }
+}
+function drawStrength(js) {
+  for (const [k] of STRENGTH) {
+    const s = js.series[k];
+    if (!s || !ss[k]) continue;
+    for (const c in COLORS) ss[k].lines[c].setData(s.points.map(p => ({ time: p.t + JST, value: p[c] })));
+    ss[k].chart.timeScale().fitContent();
+  }
+}
+
+// ---- 建玉（損益は含まれない） ----
+function table(head, rows) {
+  const w = el("div", "wrap"), t = el("table"), tr = el("tr");
+  head.forEach(h => tr.append(el("th", null, h)));
+  t.append(tr);
+  rows.forEach(r => {
+    const row = el("tr");
+    r.forEach(v => row.append(v instanceof Node ? v : el("td", null, v)));
+    t.append(row);
+  });
+  w.append(t);
+  return w;
+}
+function drawPositions(js) {
+  const box = $("positions");
+  box.replaceChildren();
+  const side = u => el("td", +u > 0 ? "buy" : "sell", +u > 0 ? "Buy" : "Sell");
+  const pair = s => (s || "").replace("_", "/");
+  const flags = t => [t.has_sl && "SL", t.has_tp && "TP", t.has_trailing && "TS"].filter(Boolean).join(" ") || "-";
+  if (js.open_trades.length) {
+    box.append(table(["通貨ペア", "売買", "数量", "建値", "建てた時刻(JST)", "タグ", "決済設定"],
+      js.open_trades.map(t => [pair(t.instrument), side(t.units), String(Math.abs(t.units)), t.price,
+                               t.open_time ? fmt(t.open_time) : "-", t.tag || "-", flags(t)])));
+  } else {
+    box.append(el("p", "mut", "建玉なし"));
+  }
+  if (js.pending_orders.length) {
+    box.append(el("div", "mut", "未約定注文"));
+    box.append(table(["通貨ペア", "種類", "売買", "数量", "価格", "タグ"],
+      js.pending_orders.map(o => [pair(o.instrument), o.type, side(o.units), String(Math.abs(o.units)),
+                                  o.price || "-", o.tag || "-"])));
+  }
+}
+
+// ---- 更新状況バー ----
+function drawStatus(st) {
+  const age = (Date.now() / 1000 - st.generated_at) / 60;
+  const stale = age > STALE_MIN;
+  const bar = $("bar");
+  bar.className = stale ? "bad" : "";
+  bar.textContent = `最終更新 ${fmt(st.generated_at)} JST（${Math.round(age)}分前）`
+    + (st.errors && st.errors.length ? ` ／ 取得エラー ${st.errors.length}件` : "")
+    + (stale ? " ／ 更新が止まっている可能性があります" : "");
+}
+
+// ---- 再取得 ----
+async function refresh() {
+  const [st, h1, d1, sg, po] = await Promise.allSettled(
+    ["status.json", "h1.json", "d1.json", "strength.json", "positions.json"].map(get));
+  if (st.status === "fulfilled") {
+    drawStatus(st.value);
+  } else {
+    $("bar").className = "bad";
+    $("bar").textContent = "データを取得できません: " + st.reason.message;
+  }
+  if (h1.status === "fulfilled") data.H1 = h1.value;
+  if (d1.status === "fulfilled") data.D1 = d1.value;
+  drawCandles();
+  if (sg.status === "fulfilled") drawStrength(sg.value);
+  $("posSec").hidden = po.status !== "fulfilled";   // positions.json が無ければ欄ごと隠す
+  if (po.status === "fulfilled") drawPositions(po.value);
+}
+
+document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
+  tf = b.dataset.tf;
+  document.querySelectorAll(".tabs button").forEach(x => x.classList.toggle("on", x === b));
+  buildCandles();
+  drawCandles();
+});
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
+
+buildCandles();
+buildStrength();
+refresh();
+setInterval(refresh, REFRESH_MS);
+</script>
+</body>
+</html>
