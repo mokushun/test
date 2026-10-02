@@ -1,234 +1,207 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>FX Monitor</title>
-<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#1b2430">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <style>
-:root { --bd:#ddd; --mut:#666; }
-body { font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif; margin: 10px; color: #222; }
-h1 { font-size: 18px; margin: 0 0 6px; }
-h2 { font-size: 15px; margin: 22px 0 8px; }
-#bar { padding: 6px 10px; border-radius: 4px; font-size: 13px; margin-bottom: 8px; background: #eef6ee; }
-#bar.bad { background: #fde8e8; color: #a00; font-weight: bold; }
-.tabs { margin-bottom: 8px; }
-.tabs button { padding: 4px 14px; border: 1px solid var(--bd); background: #fff; cursor: pointer; font-size: 13px; }
-.tabs button.on { background: #222; color: #fff; }
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
-.box { border: 1px solid var(--bd); padding: 6px; border-radius: 4px; min-width: 0; }
-.ttl { font-weight: bold; font-size: 13px; display: flex; justify-content: space-between; margin-bottom: 4px; }
-.chart { height: 240px; }
-.legend span { font-size: 11px; font-weight: bold; margin-right: 8px; }
-.wrap { overflow-x: auto; margin-bottom: 10px; }
-table { border-collapse: collapse; font-size: 13px; width: 100%; }
-th, td { border-bottom: 1px solid var(--bd); padding: 4px 8px; text-align: left; white-space: nowrap; }
-.buy { color: #1a7f37; font-weight: bold; }
-.sell { color: #c62828; font-weight: bold; }
-.mut { color: var(--mut); font-size: 13px; }
+:root{--bg:#f5f6f8;--sf:#fff;--ink:#1b2430;--mute:#6b7685;--line:#e1e5ea;--gain:#1f6fd1;--loss:#d4432b;--a:#1f6fd1;--b:#e08a00}
+@media(prefers-color-scheme:dark){:root{--bg:#12161c;--sf:#1a2028;--ink:#e8ecf1;--mute:#8f9aa8;--line:#2a323c;--gain:#5aa2f5;--loss:#ff7a5c;--a:#5aa2f5;--b:#f0a431}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,"Hiragino Kaku Gothic ProN","Noto Sans JP",Meiryo,sans-serif;font-variant-numeric:tabular-nums;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+main,header,nav{max-width:860px;margin:0 auto;padding-left:14px;padding-right:14px}
+header{display:flex;align-items:center;gap:8px;padding-top:12px}
+header h1{font-size:17px;margin:0;flex:1}
+button,select{font:inherit;color:var(--ink);background:var(--sf);border:1px solid var(--line);border-radius:6px;padding:5px 12px}
+.m{color:var(--mute);font-size:13px}
+.g{color:var(--gain)}.l{color:var(--loss)}
+#msg{padding:0 14px;max-width:860px;margin:2px auto;font-size:13px;color:var(--loss)}
+nav{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-top:8px}
+nav button{border:0;border-bottom:2px solid transparent;border-radius:0;background:none;padding:8px 12px;color:var(--mute)}
+nav button.on{color:var(--ink);border-bottom-color:var(--ink);font-weight:600}
+main{padding-bottom:40px}
+.pane{display:none}.pane.on{display:block}
+h2{font-size:14px;margin:22px 0 4px}
+.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:12px 16px;margin:16px 0}
+.kpi span{display:block;color:var(--mute);font-size:12px}
+.kpi b{font-size:19px}
+.big{font-size:22px}
+.r{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:7px 0;border-bottom:1px solid var(--line)}
+.r>span:first-child{flex:1}
+.pos{margin-top:8px;border-top:2px solid var(--ink)}
+.pos .top{border-bottom:0}
+.nm{font-size:18px}
+.sub{padding-left:14px;font-size:14px}
+table{width:100%;border-collapse:collapse;margin-top:8px}
+th,td{padding:7px 0;border-bottom:1px solid var(--line);text-align:right}
+th:first-child,td:first-child{text-align:left}
+th{font-weight:600;font-size:13px}
+.best{font-weight:700}
+.ch{position:relative;height:220px;margin:4px 0 10px}
+dialog{border:1px solid var(--line);border-radius:8px;background:var(--sf);color:var(--ink);width:min(92vw,420px)}
+dialog::backdrop{background:#0006}
+dialog label{display:block;margin:12px 0;font-size:13px;color:var(--mute)}
+dialog input{display:block;width:100%;margin-top:4px;padding:8px;font-size:16px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px}
+.pri{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 </style>
 </head>
 <body>
-<h1>FX Monitor</h1>
-<div id="bar">読み込み中…</div>
-
-<div class="tabs">
-  <button data-tf="H1" class="on">H1</button>
-  <button data-tf="D1">D1</button>
-</div>
-<div id="candles" class="grid"></div>
-
-<h2>Currency Strength</h2>
-<div id="strength" class="grid"></div>
-
-<section id="posSec" hidden>
-  <h2>Positions</h2>
-  <div id="positions"></div>
-</section>
-
+<header>
+  <h1>FX Monitor</h1>
+  <span class="m" id="upd"></span>
+  <button id="rf" aria-label="更新">更新</button>
+  <button id="st" aria-label="設定">設定</button>
+</header>
+<div id="msg"></div>
+<nav>
+  <button data-t="pos" class="on">ポジション</button>
+  <button data-t="cmp">仲値比較</button>
+  <button data-t="str">手法別</button>
+</nav>
+<main>
+  <section id="pos" class="pane on"></section>
+  <section id="cmp" class="pane">
+    <div id="cmpT"></div>
+    <h2>決済曜日別のPF</h2><div class="ch"><canvas id="c1"></canvas></div>
+    <h2>決済曜日別の勝率（%）</h2><div class="ch"><canvas id="c2"></canvas></div>
+    <h2>月別のPF</h2><div class="ch"><canvas id="c3"></canvas></div>
+    <p class="m">損失が1件もない区間はPFを計算できないため、棒が出ません。件数が少ない区間は参考程度に見てください。</p>
+  </section>
+  <section id="str" class="pane">
+    <p><select id="sel"></select></p>
+    <div id="strK" class="kpi"></div>
+    <h2>累積損益</h2><div class="ch"><canvas id="s1"></canvas></div>
+    <h2>月別損益</h2><div class="ch"><canvas id="s2"></canvas></div>
+    <div id="sw"><h2>決済曜日別損益</h2><div class="ch"><canvas id="s3"></canvas></div></div>
+  </section>
+</main>
+<dialog id="dlg">
+  <h2 style="margin-top:0">接続設定</h2>
+  <label>データのURL<input id="u" placeholder="https://example.com/oanda/stats.json" autocapitalize="off" autocorrect="off"></label>
+  <label>トークン<input id="t" type="password" autocomplete="off"></label>
+  <div style="display:flex;gap:8px;justify-content:flex-end">
+    <button id="no">閉じる</button><button id="ok" class="pri">保存して取得</button>
+  </div>
+</dialog>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
-// ---- 設定 ----
-const BASE = "https://x162-43-35-129.static.xvps.ne.jp/public/";   // update.py の出力を配信している場所
-const SYMBOLS = ["US100","JP225","US500","USDJPY","EURUSD","EURJPY",
-                 "USDCHF","AUDCHF","GBPCHF","GBPUSD","AUDUSD","CHFJPY"];
-const SHOW = { H1: 120, D1: 100 };       // 表示本数
-const STALE_MIN = 25;                    // これ以上更新が無ければ警告（分）
-const REFRESH_MS = 120000;               // 自動再取得の間隔
-const COLORS = { USD:"#2196F3", JPY:"#F44336", EUR:"#4CAF50", GBP:"#9C27B0", AUD:"#FF9800", CHF:"#795548" };
-const STRENGTH = [["short","Short (gen=0.98)"], ["mid","Mid (gen=0.996)"], ["long","Long (gen=0.999)"]];
+const $=s=>document.querySelector(s), LS=localStorage;
+let D=null, tab='pos', charts={};
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const num=(v,d=0)=>v==null?'—':Number(v).toLocaleString('ja-JP',{minimumFractionDigits:d,maximumFractionDigits:d});
+const sgn=v=>v==null?'—':(v>0?'+':'')+num(v);
+const cls=v=>v>0?'g':v<0?'l':'';
+const pf=s=>s.pf!=null?s.pf.toFixed(2):(s.gp>0?'∞':'—');
+const pct=v=>v==null?'—':v.toFixed(1)+'%';
+const msg=t=>$('#msg').textContent=t;
 
-// ---- 共通 ----
-const JST = 9 * 3600;   // JSON の時刻は UTC 秒。表示は JST にずらす
-let tf = "H1", cs = {}, ss = {}, data = {};
-const $ = id => document.getElementById(id);
-const el = (tag, cls, text) => {
-  const e = document.createElement(tag);
-  if (cls) e.className = cls;
-  if (text != null) e.textContent = text;
-  return e;
-};
-const fmt = t => new Date((t + JST) * 1000).toISOString().slice(5, 16).replace("T", " ");
-const day = t => new Date((t + JST) * 1000).toISOString().slice(0, 10);
-const get = async name => {
-  const r = await fetch(BASE + name, { cache: "no-cache" });
-  if (!r.ok) throw new Error(name + " " + r.status);
-  return r.json();
-};
-const baseOpts = timeVisible => ({
-  autoSize: true, handleScroll: false, handleScale: false,
-  layout: { background: { color: "#ffffff" }, textColor: "#000" },
-  grid: { vertLines: { visible: false }, horzLines: { color: "#f0f0f0" } },
-  rightPriceScale: { borderVisible: false },
-  timeScale: { borderVisible: false, timeVisible, rightOffset: 2 }
-});
+function chart(id,type,labels,sets,y){
+  if(charts[id])charts[id].destroy();
+  const mu=css('--mute');
+  charts[id]=new Chart($('#'+id),{type,data:{labels,datasets:sets},options:{
+    responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:sets.length>1,labels:{color:mu,boxWidth:12}}},
+    scales:{x:{ticks:{color:mu,maxTicksLimit:8},grid:{display:false}},y:{ticks:{color:mu},grid:{color:css('--line')},...y}}}});
+}
+const signColors=vs=>vs.map(v=>v>=0?css('--gain'):css('--loss'));
 
-// ---- ローソク足 ----
-function candle(p) {
-  const d = { time: tf === "H1" ? p.t + JST : day(p.t), open: p.o, high: p.h, low: p.l, close: p.c };
-  if (p.cur) {   // 未確定の現在足は薄い色
-    const up = p.c >= p.o;
-    d.color = up ? "#b3d1ff" : "#ffc2c2";
-    d.borderColor = d.wickColor = up ? "#4a80d9" : "#d94a4a";
-  }
-  return d;
-}
-function buildCandles() {
-  Object.values(cs).forEach(c => c.chart.remove());
-  cs = {};
-  $("candles").replaceChildren();
-  for (const s of SYMBOLS) {
-    const box = el("div", "box"), ttl = el("div", "ttl");
-    const px = el("span");
-    ttl.append(el("span", null, s + " " + tf), px);
-    const div = el("div", "chart");
-    box.append(ttl, div);
-    $("candles").append(box);
-    const chart = LightweightCharts.createChart(div, baseOpts(tf === "H1"));
-    cs[s] = { chart, series: chart.addCandlestickSeries(), px };
-  }
-}
-function drawCandles() {
-  const d = data[tf];
-  if (!d) return;
-  for (const s of SYMBOLS) {
-    const arr = d.symbols[s];
-    if (!cs[s] || !arr || !arr.length) continue;
-    const pts = arr.slice(-SHOW[tf]);
-    cs[s].series.setData(pts.map(candle));
-    cs[s].chart.timeScale().fitContent();
-    cs[s].px.textContent = pts[pts.length - 1].c;
-  }
+/* ---- ポジション ---- */
+function rPos(){
+  const p=D.positions, t=p.total;
+  const lab=k=>(p.by_tag[k]||{}).label||k;
+  let h=`<div class="kpi"><div><span>含み損益（合計）</span><b class="big ${cls(t.unrealized)}">${sgn(t.unrealized)}</b></div><div><span>保有</span><b>${t.n}件</b></div></div>`;
+  h+='<h2>手法別</h2>'+Object.entries(p.by_tag).map(([k,v])=>
+    `<div class="r"><span>${v.label}</span><span class="m">${v.n}件</span><b class="${cls(v.unrealized)}">${sgn(v.unrealized)}</b></div>`).join('');
+  h+='<h2>通貨ペア別（含み損が大きい順）</h2>';
+  h+=[...p.by_instrument].sort((a,b)=>a.unrealized-b.unrealized).map(r=>
+    `<div class="pos"><div class="r top"><span><b class="nm">${r.instrument.replace('_','/')}</b> <span class="m">${r.side==='long'?'買':'売'} ${r.n}件・${num(r.units)}通貨・平均${r.avg_price}</span></span><b class="big ${cls(r.unrealized)}">${sgn(r.unrealized)}</b></div>`+
+    Object.entries(r.by_tag).map(([k,v])=>`<div class="r sub"><span>${lab(k)}</span><span class="m">${v.n}件・${num(v.units)}通貨</span><b class="${cls(v.unrealized)}">${sgn(v.unrealized)}</b></div>`).join('')+'</div>').join('');
+  $('#pos').innerHTML=h||'<p class="m">保有ポジションはありません</p>';
 }
 
-// ---- 通貨強弱 ----
-function buildStrength() {
-  const g = $("strength");
-  g.replaceChildren();
-  for (const [k, label] of STRENGTH) {
-    const box = el("div", "box");
-    box.append(el("div", "ttl", label));
-    const lg = el("div", "legend");
-    for (const c in COLORS) {
-      const sp = el("span", null, c);
-      sp.style.color = COLORS[c];
-      lg.append(sp);
-    }
-    const div = el("div", "chart");
-    box.append(lg, div);
-    g.append(box);
-    const chart = LightweightCharts.createChart(div, baseOpts(true));
-    const lines = {};
-    for (const c in COLORS) {
-      lines[c] = chart.addLineSeries({ color: COLORS[c], lineWidth: 1, priceLineVisible: false,
-                                       lastValueVisible: false, crosshairMarkerVisible: false });
-    }
-    ss[k] = { chart, lines };
-  }
-}
-function drawStrength(js) {
-  for (const [k] of STRENGTH) {
-    const s = js.series[k];
-    if (!s || !ss[k]) continue;
-    for (const c in COLORS) ss[k].lines[c].setData(s.points.map(p => ({ time: p.t + JST, value: p[c] })));
-    ss[k].chart.timeScale().fitContent();
-  }
+/* ---- 仲値比較 ---- */
+function rCmp(){
+  const A=D.strategies.NAKANE_BUY_SINCE||D.strategies.NAKANE_BUY, B=D.strategies.TEST_NAKANE_BUY;
+  if(!A||!B){$('#cmpT').innerHTML='<p class="m">仲値2手法のデータがありません</p>';return;}
+  const rng=s=>s.equity.length?s.equity[0][0].slice(5)+' 〜 '+s.equity[s.equity.length-1][0].slice(5):'—';
+  const R=[ // [名前, 良い方向(1高い/-1低い/0なし), 比較値, 表示]
+    ['期間（決済日）',0,()=>null,rng],
+    ['件数',0,()=>null,s=>s.summary.n],
+    ['PF',1,s=>s.summary.pf!=null?s.summary.pf:(s.summary.gp>0?1e9:null),s=>pf(s.summary)],
+    ['勝率',1,s=>s.summary.win_rate,s=>pct(s.summary.win_rate)],
+    ['平均pips',1,s=>s.summary.avg_pips,s=>num(s.summary.avg_pips,1)],
+    ['1万通貨あたり損益',1,s=>s.summary.per10k,s=>sgn(s.summary.per10k)]];
+  $('#cmpT').innerHTML=`<table><tr><th></th><th style="color:var(--a)">${A.label}</th><th style="color:var(--b)">${B.label}</th></tr>`+
+    R.map(([n,d,v,f])=>{const a=v(A),b=v(B);let ca='',cb='';
+      if(d&&a!=null&&b!=null&&a!==b){const aw=d>0?a>b:a<b;ca=aw?'best':'';cb=aw?'':'best';}
+      return `<tr><td>${n}</td><td class="${ca}">${f(A)}</td><td class="${cb}">${f(B)}</td></tr>`;}).join('')+'</table>';
+  const wd=[0,1,2,3,4,5,6].filter(i=>A.by_weekday[i].n||B.by_weekday[i].n), L=wd.map(i=>D.weekday_labels[i]);
+  const two=(keys,get)=>[{label:A.label,data:keys.map(k=>get(A,k)),backgroundColor:css('--a')},{label:B.label,data:keys.map(k=>get(B,k)),backgroundColor:css('--b')}];
+  chart('c1','bar',L,two(wd,(s,i)=>s.by_weekday[i].pf));
+  chart('c2','bar',L,two(wd,(s,i)=>s.by_weekday[i].win_rate),{min:0,max:100});
+  const ms=[...new Set([...Object.keys(A.by_month),...Object.keys(B.by_month)])].sort();
+  chart('c3','bar',ms,two(ms,(s,m)=>s.by_month[m]?s.by_month[m].pf:null));
 }
 
-// ---- 建玉（損益は含まれない） ----
-function table(head, rows) {
-  const w = el("div", "wrap"), t = el("table"), tr = el("tr");
-  head.forEach(h => tr.append(el("th", null, h)));
-  t.append(tr);
-  rows.forEach(r => {
-    const row = el("tr");
-    r.forEach(v => row.append(v instanceof Node ? v : el("td", null, v)));
-    t.append(row);
-  });
-  w.append(t);
-  return w;
-}
-function drawPositions(js) {
-  const box = $("positions");
-  box.replaceChildren();
-  const side = u => el("td", +u > 0 ? "buy" : "sell", +u > 0 ? "Buy" : "Sell");
-  const pair = s => (s || "").replace("_", "/");
-  const flags = t => [t.has_sl && "SL", t.has_tp && "TP", t.has_trailing && "TS"].filter(Boolean).join(" ") || "-";
-  if (js.open_trades.length) {
-    box.append(table(["通貨ペア", "売買", "数量", "建値", "建てた時刻(JST)", "タグ", "決済設定"],
-      js.open_trades.map(t => [pair(t.instrument), side(t.units), String(Math.abs(t.units)), t.price,
-                               t.open_time ? fmt(t.open_time) : "-", t.tag || "-", flags(t)])));
-  } else {
-    box.append(el("p", "mut", "建玉なし"));
-  }
-  if (js.pending_orders.length) {
-    box.append(el("div", "mut", "未約定注文"));
-    box.append(table(["通貨ペア", "種類", "売買", "数量", "価格", "タグ"],
-      js.pending_orders.map(o => [pair(o.instrument), o.type, side(o.units), String(Math.abs(o.units)),
-                                  o.price || "-", o.tag || "-"])));
-  }
+/* ---- 手法別 ---- */
+function rStr(){
+  const sel=$('#sel'), keep=sel.value;
+  sel.innerHTML=Object.entries(D.strategies).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('');
+  if(D.strategies[keep])sel.value=keep;
+  const k=sel.value, S=D.strategies[k], m=S.summary;
+  const un=k==='ALL'?D.positions.total.unrealized:(D.positions.by_tag[k]||{}).unrealized;
+  const K=[['確定損益',sgn(m.net),cls(m.net)],['PF',pf(m)],['勝率',pct(m.win_rate)],['件数',num(m.n)],['平均pips',num(m.avg_pips,1)],['最大ドローダウン',num(m.max_dd)],['スワップ計',sgn(m.swap),cls(m.swap)]];
+  if(un!=null)K.push(['含み損益',sgn(un),cls(un)],['確定＋含み',sgn(m.net+un),cls(m.net+un)]);
+  $('#strK').innerHTML=K.map(([n,v,c])=>`<div><span>${n}</span><b class="${c||''}">${v}</b></div>`).join('');
+  chart('s1','line',S.equity.map(e=>e[0]),[{data:S.equity.map(e=>e[1]),borderColor:css('--a'),borderWidth:2,pointRadius:0}]);
+  const ms=Object.keys(S.by_month), mv=ms.map(x=>S.by_month[x].net);
+  chart('s2','bar',ms,[{data:mv,backgroundColor:signColors(mv)}]);
+  const show=S.show_weekday&&m.n>0;
+  $('#sw').style.display=show?'':'none';
+  if(show){const wd=[0,1,2,3,4,5,6].filter(i=>S.by_weekday[i].n), wv=wd.map(i=>S.by_weekday[i].net);
+    chart('s3','bar',wd.map(i=>D.weekday_labels[i]),[{data:wv,backgroundColor:signColors(wv)}]);}
 }
 
-// ---- 更新状況バー ----
-function drawStatus(st) {
-  const age = (Date.now() / 1000 - st.generated_at) / 60;
-  const stale = age > STALE_MIN;
-  const bar = $("bar");
-  bar.className = stale ? "bad" : "";
-  bar.textContent = `最終更新 ${fmt(st.generated_at)} JST（${Math.round(age)}分前）`
-    + (st.errors && st.errors.length ? ` ／ 取得エラー ${st.errors.length}件` : "")
-    + (stale ? " ／ 更新が止まっている可能性があります" : "");
+/* ---- 共通 ---- */
+function render(){
+  if(!D)return;
+  const t=new Date(D.generated_at);
+  $('#upd').textContent=t.toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})+' 更新';
+  $('#upd').className='m '+(Date.now()-t>30*60e3?'l':'');
+  ({pos:rPos,cmp:rCmp,str:rStr})[tab]();
 }
-
-// ---- 再取得 ----
-async function refresh() {
-  const [st, h1, d1, sg, po] = await Promise.allSettled(
-    ["status.json", "h1.json", "d1.json", "strength.json", "positions.json"].map(get));
-  if (st.status === "fulfilled") {
-    drawStatus(st.value);
-  } else {
-    $("bar").className = "bad";
-    $("bar").textContent = "データを取得できません: " + st.reason.message;
-  }
-  if (h1.status === "fulfilled") data.H1 = h1.value;
-  if (d1.status === "fulfilled") data.D1 = d1.value;
-  drawCandles();
-  if (sg.status === "fulfilled") drawStrength(sg.value);
-  $("posSec").hidden = po.status !== "fulfilled";   // positions.json が無ければ欄ごと隠す
-  if (po.status === "fulfilled") drawPositions(po.value);
+async function load(){
+  const url=LS.getItem('fx_url'), tok=LS.getItem('fx_tok')||'';
+  if(!url){openDlg();return;}
+  try{
+    const r=await fetch(url,{headers:{Authorization:'Bearer '+tok},cache:'no-store'});
+    if(r.status===401){msg('トークンが違います。設定を確認してください。');openDlg();return;}
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    D=await r.json();msg('');render();
+  }catch(e){msg('取得に失敗しました（'+e.message+'）。URLと通信状態を確認してください。');}
 }
-
-document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
-  tf = b.dataset.tf;
-  document.querySelectorAll(".tabs button").forEach(x => x.classList.toggle("on", x === b));
-  buildCandles();
-  drawCandles();
-});
-document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
-
-buildCandles();
-buildStrength();
-refresh();
-setInterval(refresh, REFRESH_MS);
+function openDlg(){$('#u').value=LS.getItem('fx_url')||'';$('#t').value=LS.getItem('fx_tok')||'';$('#dlg').showModal();}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
+  tab=b.dataset.t;
+  document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.id===tab));
+  render();});
+$('#sel').onchange=render;
+$('#rf').onclick=load;
+$('#st').onclick=openDlg;
+$('#no').onclick=()=>$('#dlg').close();
+$('#ok').onclick=()=>{LS.setItem('fx_url',$('#u').value.trim());LS.setItem('fx_tok',$('#t').value.trim());$('#dlg').close();load();};
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)load();});
+setInterval(()=>{if(!document.hidden)load();},5*60e3);
+matchMedia('(prefers-color-scheme:dark)').addEventListener('change',render);
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');
+load();
 </script>
 </body>
 </html>
