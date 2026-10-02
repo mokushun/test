@@ -22,8 +22,8 @@ button,select{font:inherit;color:var(--ink);background:var(--sf);border:1px soli
 .m{color:var(--mute);font-size:13px}
 .g{color:var(--gain)}.l{color:var(--loss)}
 #msg{padding:0 14px;max-width:860px;margin:2px auto;font-size:13px;color:var(--loss)}
-nav{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-top:8px}
-nav button{border:0;border-bottom:2px solid transparent;border-radius:0;background:none;padding:8px 12px;color:var(--mute)}
+nav{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-top:8px;overflow-x:auto}
+nav button{border:0;border-bottom:2px solid transparent;border-radius:0;background:none;padding:8px 10px;white-space:nowrap;color:var(--mute)}
 nav button.on{color:var(--ink);border-bottom-color:var(--ink);font-weight:600}
 main{padding-bottom:40px}
 .pane{display:none}.pane.on{display:block}
@@ -49,6 +49,15 @@ dialog::backdrop{background:#0006}
 dialog label{display:block;margin:12px 0;font-size:13px;color:var(--mute)}
 dialog input{display:block;width:100%;margin-top:4px;padding:8px;font-size:16px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px}
 .pri{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+#bar{padding:6px 10px;border-radius:6px;font-size:13px;margin:12px 0 8px;background:var(--sf)}
+#bar.bad{color:var(--loss);font-weight:700}
+.tf button.on{background:var(--ink);color:var(--bg)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.box{border:1px solid var(--line);border-radius:6px;padding:6px;min-width:0}
+.ttl{display:flex;justify-content:space-between;font-weight:600;font-size:13px;margin-bottom:4px}
+.lc{height:240px}
+.lg span{font-size:11px;font-weight:700;margin-right:8px}
+.wrap{overflow-x:auto}.wrap td,.wrap th{white-space:nowrap;padding-left:8px}
 </style>
 </head>
 <body>
@@ -61,11 +70,18 @@ dialog input{display:block;width:100%;margin-top:4px;padding:8px;font-size:16px;
 <div id="msg"></div>
 <nav>
   <button data-t="pos" class="on">ポジション</button>
+  <button data-t="chart">チャート</button>
   <button data-t="cmp">仲値比較</button>
   <button data-t="str">手法別</button>
 </nav>
 <main>
   <section id="pos" class="pane on"></section>
+  <section id="chart" class="pane">
+    <div id="bar">読み込み中…</div>
+    <div class="tf"><button data-tf="H1" class="on">H1</button> <button data-tf="D1">D1</button></div>
+    <div id="candles" class="grid" style="margin-top:8px"></div>
+    <h2>通貨強弱</h2><div id="strength" class="grid"></div>
+  </section>
   <section id="cmp" class="pane">
     <div id="cmpT"></div>
     <h2>決済曜日別のPF</h2><div class="ch"><canvas id="c1"></canvas></div>
@@ -90,6 +106,7 @@ dialog input{display:block;width:100%;margin-top:4px;padding:8px;font-size:16px;
   </div>
 </dialog>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 <script>
 const $=s=>document.querySelector(s), LS=localStorage;
 let D=null, tab='pos', charts={};
@@ -122,6 +139,8 @@ function rPos(){
   h+=[...p.by_instrument].sort((a,b)=>a.unrealized-b.unrealized).map(r=>
     `<div class="pos"><div class="r top"><span><b class="nm">${r.instrument.replace('_','/')}</b> <span class="m">${r.side==='long'?'買':'売'} ${r.n}件・${num(r.units)}通貨・平均${r.avg_price}</span></span><b class="big ${cls(r.unrealized)}">${sgn(r.unrealized)}</b></div>`+
     Object.entries(r.by_tag).map(([k,v])=>`<div class="r sub"><span>${lab(k)}</span><span class="m">${v.n}件・${num(v.units)}通貨</span><b class="${cls(v.unrealized)}">${sgn(v.unrealized)}</b></div>`).join('')+'</div>').join('');
+  const po=(PUB.po&&PUB.po.pending_orders)||[];
+  if(po.length)h+='<h2>未約定注文</h2><div class="wrap"><table><tr><th>通貨ペア</th><th>種類</th><th>売買</th><th>数量</th><th>価格</th><th>タグ</th></tr>'+po.map(o=>`<tr><td>${o.instrument.replace('_','/')}</td><td>${o.type}</td><td>${+o.units>0?'買':'売'}</td><td>${Math.abs(o.units)}</td><td>${o.price||'-'}</td><td>${o.tag||'-'}</td></tr>`).join('')+'</table></div>';
   $('#pos').innerHTML=h||'<p class="m">保有ポジションはありません</p>';
 }
 
@@ -168,8 +187,89 @@ function rStr(){
     chart('s3','bar',wd.map(i=>D.weekday_labels[i]),[{data:wv,backgroundColor:signColors(wv)}]);}
 }
 
+/* ---- チャート（値動き・通貨強弱。データはVPSの /public/、認証なし） ---- */
+const PUBURL='https://x162-43-35-129.static.xvps.ne.jp/public/';
+const SYMBOLS=["US100","JP225","US500","USDJPY","EURUSD","EURJPY","USDCHF","AUDCHF","GBPCHF","GBPUSD","AUDUSD","CHFJPY"];
+const SHOW={H1:120,D1:100}, STALE_MIN=25, JST=9*3600;
+const CCOL={USD:"#2196F3",JPY:"#F44336",EUR:"#4CAF50",GBP:"#9C27B0",AUD:"#FF9800",CHF:"#795548"};
+const STR=[["short","Short (gen=0.98)"],["mid","Mid (gen=0.996)"],["long","Long (gen=0.999)"]];
+let tf='H1', cs={}, ss={}, PUB={}, built=false;
+const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e;};
+const fmt=t=>new Date((t+JST)*1000).toISOString().slice(5,16).replace('T',' ');
+const dayS=t=>new Date((t+JST)*1000).toISOString().slice(0,10);
+const pget=async n=>{const r=await fetch(PUBURL+n,{cache:'no-cache'});if(!r.ok)throw new Error(n+' '+r.status);return r.json();};
+const lcOpts=tv=>({autoSize:true,handleScroll:false,handleScale:false,
+  layout:{background:{color:'transparent'},textColor:css('--ink')},
+  grid:{vertLines:{visible:false},horzLines:{color:css('--line')}},
+  rightPriceScale:{borderVisible:false},timeScale:{borderVisible:false,timeVisible:tv,rightOffset:2}});
+function candle(p){
+  const d={time:tf==='H1'?p.t+JST:dayS(p.t),open:p.o,high:p.h,low:p.l,close:p.c};
+  if(p.cur){const up=p.c>=p.o;d.color=up?'#b3d1ff':'#ffc2c2';d.borderColor=d.wickColor=up?'#4a80d9':'#d94a4a';}
+  return d;
+}
+function buildCandles(){
+  Object.values(cs).forEach(x=>x.lc.remove());cs={};
+  $('#candles').replaceChildren();
+  for(const s of SYMBOLS){
+    const box=el('div','box'),ttl=el('div','ttl'),px=el('span'),div=el('div','lc');
+    ttl.append(el('span',null,s+' '+tf),px);box.append(ttl,div);$('#candles').append(box);
+    const lc=LightweightCharts.createChart(div,lcOpts(tf==='H1'));
+    cs[s]={lc,series:lc.addCandlestickSeries(),px};
+  }
+}
+function drawCandles(){
+  const d=PUB[tf];if(!d)return;
+  for(const s of SYMBOLS){
+    const a=d.symbols[s];if(!cs[s]||!a||!a.length)continue;
+    const pts=a.slice(-SHOW[tf]);
+    cs[s].series.setData(pts.map(candle));cs[s].lc.timeScale().fitContent();
+    cs[s].px.textContent=pts[pts.length-1].c;
+  }
+}
+function buildStrength(){
+  Object.values(ss).forEach(x=>x.lc.remove());ss={};
+  const g=$('#strength');g.replaceChildren();
+  for(const [k,label] of STR){
+    const box=el('div','box'),lg=el('div','lg'),div=el('div','lc');
+    for(const c in CCOL){const sp=el('span',null,c);sp.style.color=CCOL[c];lg.append(sp);}
+    box.append(el('div','ttl',label),lg,div);g.append(box);
+    const lc=LightweightCharts.createChart(div,lcOpts(true)),lines={};
+    for(const c in CCOL)lines[c]=lc.addLineSeries({color:CCOL[c],lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
+    ss[k]={lc,lines};
+  }
+}
+function drawStrength(js){
+  for(const [k] of STR){
+    const s=js.series[k];if(!s||!ss[k])continue;
+    for(const c in CCOL)ss[k].lines[c].setData(s.points.map(p=>({time:p.t+JST,value:p[c]})));
+    ss[k].lc.timeScale().fitContent();
+  }
+}
+function drawStatus(st){
+  const age=(Date.now()/1000-st.generated_at)/60,stale=age>STALE_MIN,bar=$('#bar');
+  bar.className=stale?'bad':'';
+  bar.textContent=`最終更新 ${fmt(st.generated_at)} JST（${Math.round(age)}分前）`+(st.errors&&st.errors.length?` ／ 取得エラー ${st.errors.length}件`:'')+(stale?' ／ 更新が止まっている可能性があります':'');
+}
+function rChart(){
+  if(!built){buildCandles();buildStrength();built=true;}
+  drawCandles();if(PUB.sg)drawStrength(PUB.sg);if(PUB.st)drawStatus(PUB.st);
+}
+async function loadPub(){
+  const [st,h1,d1,sg,po]=await Promise.allSettled(['status.json','h1.json','d1.json','strength.json','positions.json'].map(pget));
+  const ok=r=>r.status==='fulfilled'?r.value:null;
+  if(st.status==='rejected'){$('#bar').className='bad';$('#bar').textContent='データを取得できません: '+st.reason.message;}
+  PUB.st=ok(st);PUB.H1=ok(h1)||PUB.H1;PUB.D1=ok(d1)||PUB.D1;PUB.sg=ok(sg)||PUB.sg;PUB.po=ok(po);
+  if(tab==='chart'||tab==='pos')render();
+}
+document.querySelectorAll('.tf button').forEach(b=>b.onclick=()=>{
+  tf=b.dataset.tf;
+  document.querySelectorAll('.tf button').forEach(x=>x.classList.toggle('on',x===b));
+  buildCandles();drawCandles();
+});
+
 /* ---- 共通 ---- */
 function render(){
+  if(tab==='chart'){rChart();return;}
   if(!D)return;
   const t=new Date(D.generated_at);
   $('#upd').textContent=t.toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})+' 更新';
@@ -197,11 +297,12 @@ $('#rf').onclick=load;
 $('#st').onclick=openDlg;
 $('#no').onclick=()=>$('#dlg').close();
 $('#ok').onclick=()=>{LS.setItem('fx_url',$('#u').value.trim());LS.setItem('fx_tok',$('#t').value.trim());$('#dlg').close();load();};
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)load();});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){load();loadPub();}});
 setInterval(()=>{if(!document.hidden)load();},5*60e3);
-matchMedia('(prefers-color-scheme:dark)').addEventListener('change',render);
+setInterval(()=>{if(!document.hidden)loadPub();},2*60e3);
+matchMedia('(prefers-color-scheme:dark)').addEventListener('change',()=>{built=false;render();});
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');
-load();
+load();loadPub();
 </script>
 </body>
 </html>

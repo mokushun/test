@@ -1,5 +1,5 @@
 // アプリ本体(HTML/アイコン/Chart.js)だけをキャッシュする。損益データ(VPS側)は一切キャッシュしない。
-const CACHE = 'fx-monitor-v1';
+const CACHE = 'fx-monitor-v2';
 const SHELL = ['./', 'index.html', 'manifest.json', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -30,7 +30,7 @@ self.addEventListener('fetch', e => {
         })
         .catch(() => caches.match(req))
     );
-  } else if (url.hostname === 'cdnjs.cloudflare.com') {
+  } else if (url.hostname === 'cdnjs.cloudflare.com' || url.hostname === 'unpkg.com') {
     // Chart.js: キャッシュ優先
     e.respondWith(
       caches.match(req).then(hit => hit || fetch(req).then(res => {
