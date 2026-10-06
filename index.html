@@ -93,6 +93,7 @@ dialog input{display:block;width:100%;margin-top:4px;padding:8px;font-size:16px;
     <p><select id="sel"></select></p>
     <div id="strK" class="kpi"></div>
     <h2>累積損益</h2><div class="ch"><canvas id="s1"></canvas></div>
+    <h2>直近10日の損益 <span id="r10" class="m"></span></h2><div class="ch"><canvas id="s4"></canvas></div>
     <h2>月別損益</h2><div class="ch"><canvas id="s2"></canvas></div>
     <div id="sw"><h2>決済曜日別損益</h2><div class="ch"><canvas id="s3"></canvas></div></div>
   </section>
@@ -168,6 +169,20 @@ function rCmp(){
   chart('c3','bar',ms,two(ms,(s,m)=>s.by_month[m]?s.by_month[m].pf:null));
 }
 
+/* ---- 直近n日の日別損益（equityの差分から算出。取引のない日は0） ---- */
+function recent(eq,n){
+  const map={};let prev=0;
+  for(const [d,c] of eq){map[d]=c-prev;prev=c;}
+  const today=new Date(Date.now()+9*3600e3); // JSTの今日
+  const labels=[],daily=[],cum=[];let c=0;
+  for(let i=n-1;i>=0;i--){
+    const k=new Date(today.getTime()-i*86400e3).toISOString().slice(0,10);
+    const v=Math.round((map[k]||0)*100)/100;
+    c+=v;
+    labels.push(k.slice(5));daily.push(v);cum.push(Math.round(c*100)/100);
+  }
+  return {labels,daily,cum,total:c};
+}
 /* ---- 手法別 ---- */
 function rStr(){
   const sel=$('#sel'), keep=sel.value;
@@ -179,6 +194,11 @@ function rStr(){
   if(un!=null)K.push(['含み損益',sgn(un),cls(un)],['確定＋含み',sgn(m.net+un),cls(m.net+un)]);
   $('#strK').innerHTML=K.map(([n,v,c])=>`<div><span>${n}</span><b class="${c||''}">${v}</b></div>`).join('');
   chart('s1','line',S.equity.map(e=>e[0]),[{data:S.equity.map(e=>e[1]),borderColor:css('--a'),borderWidth:2,pointRadius:0}]);
+  const R=recent(S.equity,10);
+  $('#r10').textContent='合計 '+sgn(R.total);
+  chart('s4','bar',R.labels,[
+    {type:'bar',label:'日別',data:R.daily,backgroundColor:signColors(R.daily),order:2},
+    {type:'line',label:'累計',data:R.cum,borderColor:css('--a'),borderWidth:2,pointRadius:2,order:1}]);
   const ms=Object.keys(S.by_month), mv=ms.map(x=>S.by_month[x].net);
   chart('s2','bar',ms,[{data:mv,backgroundColor:signColors(mv)}]);
   const show=S.show_weekday&&m.n>0;
