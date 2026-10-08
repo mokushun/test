@@ -53,6 +53,9 @@ dialog input{display:block;width:100%;margin-top:4px;padding:8px;font-size:16px;
 #bar.bad{color:var(--loss);font-weight:700}
 .tf button.on{background:var(--ink);color:var(--bg)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.grid.wide{grid-template-columns:repeat(auto-fill,minmax(min(100%,600px),1fr))}
+#syms{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
+#syms select{width:100%;padding:8px;font-size:16px;background:var(--bg)}
 .box{border:1px solid var(--line);border-radius:6px;padding:6px;min-width:0}
 .ttl{display:flex;justify-content:space-between;font-weight:600;font-size:13px;margin-bottom:4px}
 .lc{height:240px}
@@ -80,7 +83,7 @@ dialog input{display:block;width:100%;margin-top:4px;padding:8px;font-size:16px;
     <div id="bar">読み込み中…</div>
     <div class="tf"><button data-tf="H1" class="on">H1</button> <button data-tf="D1">D1</button></div>
     <div id="candles" class="grid" style="margin-top:8px"></div>
-    <h2>通貨強弱</h2><div id="strength" class="grid"></div>
+    <h2>通貨強弱</h2><div id="strength" class="grid wide"></div>
   </section>
   <section id="cmp" class="pane">
     <div id="cmpT"></div>
@@ -102,7 +105,8 @@ dialog input{display:block;width:100%;margin-top:4px;padding:8px;font-size:16px;
   <h2 style="margin-top:0">接続設定</h2>
   <label>データのURL<input id="u" placeholder="https://example.com/oanda/stats.json" autocapitalize="off" autocorrect="off"></label>
   <label>トークン<input id="t" type="password" autocomplete="off"></label>
-  <div style="display:flex;gap:8px;justify-content:flex-end">
+  <div class="m" style="margin-top:12px">チャートの通貨ペア（4つ）</div><div id="syms"></div>
+  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
     <button id="no">閉じる</button><button id="ok" class="pri">保存して取得</button>
   </div>
 </dialog>
@@ -210,7 +214,12 @@ function rStr(){
 /* ---- チャート（値動き・通貨強弱。データはVPSの /public/、認証なし） ---- */
 //const PUBURL='https://x162-43-35-129.static.xvps.ne.jp/public/';
 const PUBURL='https://fx.camelliab1.com/public/';
-const SYMBOLS=["US100","JP225","US500","USDJPY","EURUSD","EURJPY","USDCHF","AUDCHF","GBPCHF","GBPUSD","AUDUSD","CHFJPY"];
+const ALL_SYMBOLS=["US100","JP225","US500","USDJPY","EURUSD","EURJPY","USDCHF","AUDCHF","GBPCHF","GBPUSD","AUDUSD","CHFJPY"];
+const DEF_SYMBOLS=["USDJPY","EURUSD","US100","JP225"], NSYM=4;
+const normSyms=a=>{const s=[...new Set((a||[]).filter(x=>ALL_SYMBOLS.includes(x)))].slice(0,NSYM);
+  for(const x of [...DEF_SYMBOLS,...ALL_SYMBOLS]){if(s.length>=NSYM)break;if(!s.includes(x))s.push(x);}return s;};
+const loadSyms=()=>{try{return normSyms(JSON.parse(LS.getItem('fx_syms')));}catch(e){return normSyms(null);}};
+let SYMBOLS=loadSyms();
 const SHOW={H1:120,D1:100}, STALE_MIN=25, JST=9*3600;
 const CCOL={USD:"#2196F3",JPY:"#F44336",EUR:"#4CAF50",GBP:"#9C27B0",AUD:"#FF9800",CHF:"#795548"};
 const STR=[["short","Short (gen=0.98)"],["mid","Mid (gen=0.996)"],["long","Long (gen=0.999)"]];
@@ -307,7 +316,9 @@ async function load(){
     D=await r.json();msg('');render();
   }catch(e){msg('取得に失敗しました（'+e.message+'）。URLと通信状態を確認してください。');}
 }
-function openDlg(){$('#u').value=LS.getItem('fx_url')||'';$('#t').value=LS.getItem('fx_tok')||'';$('#dlg').showModal();}
+function openDlg(){$('#u').value=LS.getItem('fx_url')||'';$('#t').value=LS.getItem('fx_tok')||'';
+  $('#syms').replaceChildren(...SYMBOLS.map(s=>{const e=document.createElement('select');ALL_SYMBOLS.forEach(x=>e.add(new Option(x,x)));e.value=s;return e;}));
+  $('#dlg').showModal();}
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
   tab=b.dataset.t;
   document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));
@@ -317,7 +328,11 @@ $('#sel').onchange=render;
 $('#rf').onclick=load;
 $('#st').onclick=openDlg;
 $('#no').onclick=()=>$('#dlg').close();
-$('#ok').onclick=()=>{LS.setItem('fx_url',$('#u').value.trim());LS.setItem('fx_tok',$('#t').value.trim());$('#dlg').close();load();};
+$('#ok').onclick=()=>{LS.setItem('fx_url',$('#u').value.trim());LS.setItem('fx_tok',$('#t').value.trim());
+  SYMBOLS=normSyms([...document.querySelectorAll('#syms select')].map(e=>e.value));
+  LS.setItem('fx_syms',JSON.stringify(SYMBOLS));
+  if(built){buildCandles();drawCandles();}
+  $('#dlg').close();load();};
 document.addEventListener('visibilitychange',()=>{if(!document.hidden){load();loadPub();}});
 setInterval(()=>{if(!document.hidden)load();},5*60e3);
 setInterval(()=>{if(!document.hidden)loadPub();},2*60e3);
