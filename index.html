@@ -214,7 +214,7 @@ function rStr(){
 /* ---- チャート（値動き・通貨強弱。データはVPSの /public/、認証なし） ---- */
 //const PUBURL='https://x162-43-35-129.static.xvps.ne.jp/public/';
 const PUBURL='https://fx.camelliab1.com/public/';
-const ALL_SYMBOLS=["US100","JP225","US500","USDJPY","EURUSD","EURJPY","USDCHF","AUDCHF","GBPCHF","GBPUSD","AUDUSD","CHFJPY"];
+const ALL_SYMBOLS=["US100","JP225","US500","USDJPY","EURUSD","EURJPY","USDCHF","AUDCHF","GBPCHF","GBPUSD","AUDUSD","CHFJPY","EURGBP"];
 const DEF_SYMBOLS=["USDJPY","EURUSD","US100","JP225"], NSYM=4;
 const normSyms=a=>{const s=[...new Set((a||[]).filter(x=>ALL_SYMBOLS.includes(x)))].slice(0,NSYM);
   for(const x of [...DEF_SYMBOLS,...ALL_SYMBOLS]){if(s.length>=NSYM)break;if(!s.includes(x))s.push(x);}return s;};
