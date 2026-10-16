@@ -203,8 +203,9 @@ function recent(eq,n){
 /* ---- 手法別 ---- */
 function rStr(){
   const sel=$('#sel'), keep=sel.value;
-  sel.innerHTML=Object.entries(D.strategies).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('');
-  if(D.strategies[keep])sel.value=keep;
+  const ent=Object.entries(D.strategies).sort((a,b)=>(b[0]==='ALL')-(a[0]==='ALL')); // 合計を先頭に
+  sel.innerHTML=ent.map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('');
+  sel.value=D.strategies[keep]?keep:(D.strategies.ALL?'ALL':ent[0][0]);
   const k=sel.value, S=D.strategies[k], m=S.summary;
   const un=k==='ALL'?D.positions.total.unrealized:(D.positions.by_tag[k]||{}).unrealized;
   const K=[['確定損益',sgn(m.net),cls(m.net)],['PF',pf(m)],['勝率',pct(m.win_rate)],['件数',num(m.n)],['平均pips',num(m.avg_pips,1)],['最大ドローダウン',num(m.max_dd)],['スワップ計',sgn(m.swap),cls(m.swap)]];
