@@ -22,6 +22,10 @@ button,select{font:inherit;color:var(--ink);background:var(--sf);border:1px soli
 .m{color:var(--mute);font-size:13px}
 .g{color:var(--gain)}.l{color:var(--loss)}
 #msg{padding:0 14px;max-width:860px;margin:2px auto;font-size:13px;color:var(--loss)}
+#acct{max-width:860px;margin:6px auto 0;padding:0 14px}
+.al{padding:8px 12px;border-radius:6px;font-size:14px;font-weight:700;background:var(--sf);border:1px solid var(--line)}
+.al.warn{color:var(--b);border-color:var(--b)}.al.bad{color:var(--loss);border-color:var(--loss)}
+.w{color:var(--b)}
 nav{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-top:8px;overflow-x:auto}
 nav button{border:0;border-bottom:2px solid transparent;border-radius:0;background:none;padding:8px 10px;white-space:nowrap;color:var(--mute)}
 nav button.on{color:var(--ink);border-bottom-color:var(--ink);font-weight:600}
@@ -53,9 +57,6 @@ dialog input{display:block;width:100%;margin-top:4px;padding:8px;font-size:16px;
 #bar.bad{color:var(--loss);font-weight:700}
 .tf button.on{background:var(--ink);color:var(--bg)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
-.grid.wide{grid-template-columns:repeat(auto-fill,minmax(min(100%,600px),1fr))}
-#syms{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
-#syms select{width:100%;padding:8px;font-size:16px;background:var(--bg)}
 .box{border:1px solid var(--line);border-radius:6px;padding:6px;min-width:0}
 .ttl{display:flex;justify-content:space-between;font-weight:600;font-size:13px;margin-bottom:4px}
 .lc{height:240px}
@@ -71,6 +72,7 @@ dialog input{display:block;width:100%;margin-top:4px;padding:8px;font-size:16px;
   <button id="st" aria-label="設定">設定</button>
 </header>
 <div id="msg"></div>
+<div id="acct"></div>
 <nav>
   <button data-t="pos" class="on">ポジション</button>
   <button data-t="chart">チャート</button>
@@ -83,7 +85,7 @@ dialog input{display:block;width:100%;margin-top:4px;padding:8px;font-size:16px;
     <div id="bar">読み込み中…</div>
     <div class="tf"><button data-tf="H1" class="on">H1</button> <button data-tf="D1">D1</button></div>
     <div id="candles" class="grid" style="margin-top:8px"></div>
-    <h2>通貨強弱</h2><div id="strength" class="grid wide"></div>
+    <h2>通貨強弱</h2><div id="strength" class="grid"></div>
   </section>
   <section id="cmp" class="pane">
     <div id="cmpT"></div>
@@ -105,8 +107,7 @@ dialog input{display:block;width:100%;margin-top:4px;padding:8px;font-size:16px;
   <h2 style="margin-top:0">接続設定</h2>
   <label>データのURL<input id="u" placeholder="https://example.com/oanda/stats.json" autocapitalize="off" autocorrect="off"></label>
   <label>トークン<input id="t" type="password" autocomplete="off"></label>
-  <div class="m" style="margin-top:12px">チャートの通貨ペア（4つ）</div><div id="syms"></div>
-  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+  <div style="display:flex;gap:8px;justify-content:flex-end">
     <button id="no">閉じる</button><button id="ok" class="pri">保存して取得</button>
   </div>
 </dialog>
@@ -122,6 +123,13 @@ const cls=v=>v>0?'g':v<0?'l':'';
 const pf=s=>s.pf!=null?s.pf.toFixed(2):(s.gp>0?'∞':'—');
 const pct=v=>v==null?'—':v.toFixed(1)+'%';
 const msg=t=>$('#msg').textContent=t;
+const MR_WARN=500, MR_BAD=300; // 新規停止ライン(両建て・DCA)と、要対応ライン
+const mrCls=r=>r==null?'':r<MR_BAD?'l':r<MR_WARN?'w':'';
+function rAcct(){
+  const a=D&&D.account, box=$('#acct'), r=a&&a.margin_ratio;
+  if(r==null||r>=MR_WARN){box.innerHTML='';return;}
+  box.innerHTML=`<div class="al ${r<MR_BAD?'bad':'warn'}">維持率 ${num(r)}%　${r<MR_BAD?'要対応（'+MR_BAD+'%未満）':'新規停止ライン（'+MR_WARN+'%）を下回っています'}</div>`;
+}
 
 function chart(id,type,labels,sets,y){
   if(charts[id])charts[id].destroy();
@@ -135,9 +143,10 @@ const signColors=vs=>vs.map(v=>v>=0?css('--gain'):css('--loss'));
 
 /* ---- ポジション ---- */
 function rPos(){
-  const p=D.positions, t=p.total;
+  const p=D.positions, t=p.total, p_a=D.account;
   const lab=k=>(p.by_tag[k]||{}).label||k;
-  let h=`<div class="kpi"><div><span>含み損益（合計）</span><b class="big ${cls(t.unrealized)}">${sgn(t.unrealized)}</b></div><div><span>保有</span><b>${t.n}件</b></div></div>`;
+  let h=`<div class="kpi"><div><span>含み損益（合計）</span><b class="big ${cls(t.unrealized)}">${sgn(t.unrealized)}</b></div><div><span>保有</span><b>${t.n}件</b></div>`+
+    (p_a?`<div><span>維持率</span><b class="big ${mrCls(p_a.margin_ratio)}">${p_a.margin_ratio==null?'—':num(p_a.margin_ratio)+'%'}</b></div><div><span>純資産</span><b>${num(p_a.nav)}</b></div><div><span>必要証拠金</span><b>${num(p_a.margin_used)}</b></div>`:'')+'</div>';
   h+='<h2>手法別</h2>'+Object.entries(p.by_tag).map(([k,v])=>
     `<div class="r"><span>${v.label}</span><span class="m">${v.n}件</span><b class="${cls(v.unrealized)}">${sgn(v.unrealized)}</b></div>`).join('');
   h+='<h2>通貨ペア別（含み損が大きい順）</h2>';
@@ -214,12 +223,7 @@ function rStr(){
 /* ---- チャート（値動き・通貨強弱。データはVPSの /public/、認証なし） ---- */
 //const PUBURL='https://x162-43-35-129.static.xvps.ne.jp/public/';
 const PUBURL='https://fx.camelliab1.com/public/';
-const ALL_SYMBOLS=["US100","JP225","US500","USDJPY","EURUSD","EURJPY","USDCHF","AUDCHF","GBPCHF","GBPUSD","AUDUSD","CHFJPY","EURGBP"];
-const DEF_SYMBOLS=["USDJPY","EURUSD","US100","JP225"], NSYM=4;
-const normSyms=a=>{const s=[...new Set((a||[]).filter(x=>ALL_SYMBOLS.includes(x)))].slice(0,NSYM);
-  for(const x of [...DEF_SYMBOLS,...ALL_SYMBOLS]){if(s.length>=NSYM)break;if(!s.includes(x))s.push(x);}return s;};
-const loadSyms=()=>{try{return normSyms(JSON.parse(LS.getItem('fx_syms')));}catch(e){return normSyms(null);}};
-let SYMBOLS=loadSyms();
+const SYMBOLS=["US100","JP225","US500","USDJPY","EURUSD","EURJPY","USDCHF","AUDCHF","GBPCHF","GBPUSD","AUDUSD","CHFJPY"];
 const SHOW={H1:120,D1:100}, STALE_MIN=25, JST=9*3600;
 const CCOL={USD:"#2196F3",JPY:"#F44336",EUR:"#4CAF50",GBP:"#9C27B0",AUD:"#FF9800",CHF:"#795548"};
 const STR=[["short","Short (gen=0.98)"],["mid","Mid (gen=0.996)"],["long","Long (gen=0.999)"]];
@@ -299,6 +303,7 @@ document.querySelectorAll('.tf button').forEach(b=>b.onclick=()=>{
 
 /* ---- 共通 ---- */
 function render(){
+  rAcct();
   if(tab==='chart'){rChart();return;}
   if(!D)return;
   const t=new Date(D.generated_at);
@@ -316,9 +321,7 @@ async function load(){
     D=await r.json();msg('');render();
   }catch(e){msg('取得に失敗しました（'+e.message+'）。URLと通信状態を確認してください。');}
 }
-function openDlg(){$('#u').value=LS.getItem('fx_url')||'';$('#t').value=LS.getItem('fx_tok')||'';
-  $('#syms').replaceChildren(...SYMBOLS.map(s=>{const e=document.createElement('select');ALL_SYMBOLS.forEach(x=>e.add(new Option(x,x)));e.value=s;return e;}));
-  $('#dlg').showModal();}
+function openDlg(){$('#u').value=LS.getItem('fx_url')||'';$('#t').value=LS.getItem('fx_tok')||'';$('#dlg').showModal();}
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
   tab=b.dataset.t;
   document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));
@@ -328,11 +331,7 @@ $('#sel').onchange=render;
 $('#rf').onclick=load;
 $('#st').onclick=openDlg;
 $('#no').onclick=()=>$('#dlg').close();
-$('#ok').onclick=()=>{LS.setItem('fx_url',$('#u').value.trim());LS.setItem('fx_tok',$('#t').value.trim());
-  SYMBOLS=normSyms([...document.querySelectorAll('#syms select')].map(e=>e.value));
-  LS.setItem('fx_syms',JSON.stringify(SYMBOLS));
-  if(built){buildCandles();drawCandles();}
-  $('#dlg').close();load();};
+$('#ok').onclick=()=>{LS.setItem('fx_url',$('#u').value.trim());LS.setItem('fx_tok',$('#t').value.trim());$('#dlg').close();load();};
 document.addEventListener('visibilitychange',()=>{if(!document.hidden){load();loadPub();}});
 setInterval(()=>{if(!document.hidden)load();},5*60e3);
 setInterval(()=>{if(!document.hidden)loadPub();},2*60e3);
