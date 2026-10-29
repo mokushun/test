@@ -79,7 +79,7 @@ dialog input{display:block;width:100%;margin-top:4px;padding:8px;font-size:16px;
 <nav>
   <button data-t="pos" class="on">ポジション</button>
   <button data-t="chart">チャート</button>
-  <button data-t="cmp">仲値比較</button>
+  <button data-t="cmp">仲値</button>
   <button data-t="str">手法別</button>
 </nav>
 <main>
@@ -95,7 +95,7 @@ dialog input{display:block;width:100%;margin-top:4px;padding:8px;font-size:16px;
     <h2>決済曜日別のPF</h2><div class="ch"><canvas id="c1"></canvas></div>
     <h2>決済曜日別の勝率（%）</h2><div class="ch"><canvas id="c2"></canvas></div>
     <h2>月別のPF</h2><div class="ch"><canvas id="c3"></canvas></div>
-    <p class="m">損失が1件もない区間はPFを計算できないため、棒が出ません。件数が少ない区間は参考程度に見てください。</p>
+    <p class="m">旧2段買い（TEST_NAKANE_BUY）とNAKANE_BUYを合算した値です。PF・勝率・1万通貨あたり損益は、2手法の値から逆算して合算しているため、わずかにずれることがあります。損失が1件もない区間はPFを計算できないため、棒が出ません。件数が少ない区間は参考程度に見てください。</p>
   </section>
   <section id="str" class="pane">
     <p><select id="sel"></select></p>
@@ -135,6 +135,77 @@ function rAcct(){
   box.innerHTML=`<div class="al ${r<MR_BAD?'bad':'warn'}">維持率 ${num(r)}%　${r<MR_BAD?'要対応（'+MR_BAD+'%未満）':'新規停止ライン（'+MR_WARN+'%）を下回っています'}</div>`;
 }
 
+/* ---- 仲値2手法の合算（TEST_NAKANE_BUY を NAKANE_BUY に統合する） ---- */
+const M_SRC='TEST_NAKANE_BUY', M_DST='NAKANE_BUY', M_LABEL='仲値買い';
+const nz=v=>(v==null||!isFinite(v))?0:v;
+// {n,net,pf} から [総利益, 総損失(正の値)] を逆算する
+function glOf(x){
+  if(!x||x.n===0)return [0,0];
+  if(x.pf==null)return [Math.max(nz(x.net),0),0]; // 損失なし
+  if(x.pf===1)return [0,0];                       // 逆算できない（まれ）
+  const gl=nz(x.net)/(x.pf-1);
+  return [x.pf*gl,gl];
+}
+function mergeRow(a,b){
+  if(!a)return b; if(!b)return a;
+  const [g1,l1]=glOf(a),[g2,l2]=glOf(b),gp=g1+g2,gl=l1+l2;
+  const r={...a,net:nz(a.net)+nz(b.net),pf:gl>0?gp/gl:null};
+  if(a.n!=null||b.n!=null){
+    const n=nz(a.n)+nz(b.n);
+    r.n=n;
+    if(a.win_rate!=null||b.win_rate!=null)r.win_rate=n?(nz(a.win_rate)*nz(a.n)+nz(b.win_rate)*nz(b.n))/n:null;
+  }
+  return r;
+}
+function mergeMap(A,B){ // 配列でもオブジェクトでも合算（曜日別・月別）
+  const r=Array.isArray(A||B)?[]:{};
+  [...new Set([...Object.keys(A||{}),...Object.keys(B||{})])].sort().forEach(k=>{r[k]=mergeRow((A||{})[k],(B||{})[k]);});
+  return r;
+}
+function mergeEq(a,b){ // 累積損益を日別に戻して足し、累積に直す
+  const m={};
+  for(const eq of [a||[],b||[]]){let prev=0;for(const [d,c] of eq){m[d]=(m[d]||0)+c-prev;prev=c;}}
+  let c=0;
+  return Object.keys(m).sort().map(d=>{c+=m[d];return [d,Math.round(c*100)/100];});
+}
+function maxDd(eq){let pk=0,dd=0;for(const [,c] of eq){pk=Math.max(pk,c);dd=Math.max(dd,pk-c);}return dd;}
+function mergeStrat(a,b){
+  if(!a)return b; if(!b)return a;
+  const x=a.summary,y=b.summary;
+  const gl=s=>s.gl!=null?s.gl:(s.pf>0?s.gp/s.pf:glOf(s)[1]);
+  const wins=s=>s.wins!=null?s.wins:nz(s.win_rate)*nz(s.n)/100;
+  const u=s=>s.per10k?s.net/s.per10k:0; // 取引量（1万通貨単位）
+  const n=nz(x.n)+nz(y.n), gp=nz(x.gp)+nz(y.gp), l=gl(x)+gl(y), net=nz(x.net)+nz(y.net), u10=u(x)+u(y);
+  const eq=mergeEq(a.equity,b.equity);
+  const sign=(x.max_dd<0||y.max_dd<0)?-1:1;
+  const summary={...x,n,gp,gl:l,net,
+    pf:l>0?gp/l:null,
+    win_rate:n?(wins(x)+wins(y))/n*100:null,
+    avg_pips:n?(nz(x.avg_pips)*nz(x.n)+nz(y.avg_pips)*nz(y.n))/n:null,
+    per10k:u10?net/u10:(n?(nz(x.per10k)*nz(x.n)+nz(y.per10k)*nz(y.n))/n:null),
+    swap:nz(x.swap)+nz(y.swap),
+    max_dd:sign*maxDd(eq)};
+  return {...a,label:M_LABEL,summary,equity:eq,
+    by_weekday:mergeMap(a.by_weekday,b.by_weekday),
+    by_month:mergeMap(a.by_month,b.by_month),
+    show_weekday:!!(a.show_weekday||b.show_weekday)};
+}
+function mergeTag(o){ // ポジションのタグ別（合計・通貨ペア内）
+  const t=o&&o[M_SRC]; if(!t)return;
+  if(o[M_DST]){const d=o[M_DST];['n','units','unrealized'].forEach(f=>{if(t[f]!=null)d[f]=nz(d[f])+t[f];});}
+  else o[M_DST]=t;
+  if(o[M_DST].label)o[M_DST].label=M_LABEL;
+  delete o[M_SRC];
+}
+function combine(d){
+  const s=d.strategies||{};
+  if(s[M_SRC]||s[M_DST]){const m=mergeStrat(s[M_DST],s[M_SRC]);m.label=M_LABEL;s[M_DST]=m;delete s[M_SRC];}
+  delete s.NAKANE_BUY_SINCE; // 2手法の比較用だったので不要
+  const p=d.positions;
+  if(p){mergeTag(p.by_tag);(p.by_instrument||[]).forEach(r=>mergeTag(r.by_tag));}
+  return d;
+}
+
 function chart(id,type,labels,sets,y){
   if(charts[id])charts[id].destroy();
   const mu=css('--mute');
@@ -162,28 +233,22 @@ function rPos(){
   $('#pos').innerHTML=h||'<p class="m">保有ポジションはありません</p>';
 }
 
-/* ---- 仲値比較 ---- */
+/* ---- 仲値（曜日別・月別。旧2段買いは合算済み） ---- */
 function rCmp(){
-  const A=D.strategies.NAKANE_BUY_SINCE||D.strategies.NAKANE_BUY, B=D.strategies.TEST_NAKANE_BUY;
-  if(!A||!B){$('#cmpT').innerHTML='<p class="m">仲値2手法のデータがありません</p>';return;}
-  const rng=s=>s.equity.length?s.equity[0][0].slice(5)+' 〜 '+s.equity[s.equity.length-1][0].slice(5):'—';
-  const R=[ // [名前, 良い方向(1高い/-1低い/0なし), 比較値, 表示]
-    ['期間（決済日）',0,()=>null,rng],
-    ['件数',0,()=>null,s=>s.summary.n],
-    ['PF',1,s=>s.summary.pf!=null?s.summary.pf:(s.summary.gp>0?1e9:null),s=>pf(s.summary)],
-    ['勝率',1,s=>s.summary.win_rate,s=>pct(s.summary.win_rate)],
-    ['平均pips',1,s=>s.summary.avg_pips,s=>num(s.summary.avg_pips,1)],
-    ['1万通貨あたり損益',1,s=>s.summary.per10k,s=>sgn(s.summary.per10k)]];
-  $('#cmpT').innerHTML=`<table><tr><th></th><th style="color:var(--a)">${A.label}</th><th style="color:var(--b)">${B.label}</th></tr>`+
-    R.map(([n,d,v,f])=>{const a=v(A),b=v(B);let ca='',cb='';
-      if(d&&a!=null&&b!=null&&a!==b){const aw=d>0?a>b:a<b;ca=aw?'best':'';cb=aw?'':'best';}
-      return `<tr><td>${n}</td><td class="${ca}">${f(A)}</td><td class="${cb}">${f(B)}</td></tr>`;}).join('')+'</table>';
-  const wd=[0,1,2,3,4,5,6].filter(i=>A.by_weekday[i].n||B.by_weekday[i].n), L=wd.map(i=>D.weekday_labels[i]);
-  const two=(keys,get)=>[{label:A.label,data:keys.map(k=>get(A,k)),backgroundColor:css('--a')},{label:B.label,data:keys.map(k=>get(B,k)),backgroundColor:css('--b')}];
-  chart('c1','bar',L,two(wd,(s,i)=>s.by_weekday[i].pf));
-  chart('c2','bar',L,two(wd,(s,i)=>s.by_weekday[i].win_rate),{min:0,max:100});
-  const ms=[...new Set([...Object.keys(A.by_month),...Object.keys(B.by_month)])].sort();
-  chart('c3','bar',ms,two(ms,(s,m)=>s.by_month[m]?s.by_month[m].pf:null));
+  const S=D.strategies[M_DST];
+  if(!S){$('#cmpT').innerHTML='<p class="m">仲値のデータがありません</p>';return;}
+  const sm=S.summary;
+  const rng=S.equity.length?S.equity[0][0].slice(5)+' 〜 '+S.equity[S.equity.length-1][0].slice(5):'—';
+  const R=[['期間（決済日）',rng],['件数',num(sm.n)],['PF',pf(sm)],['勝率',pct(sm.win_rate)],
+    ['平均pips',num(sm.avg_pips,1)],['1万通貨あたり損益',sgn(sm.per10k)]];
+  $('#cmpT').innerHTML=`<table><tr><th></th><th style="color:var(--a)">${S.label}</th></tr>`+
+    R.map(([n,v])=>`<tr><td>${n}</td><td>${v}</td></tr>`).join('')+'</table>';
+  const wd=[0,1,2,3,4,5,6].filter(i=>S.by_weekday[i]&&S.by_weekday[i].n), L=wd.map(i=>D.weekday_labels[i]);
+  const one=(keys,get)=>[{label:S.label,data:keys.map(k=>get(k)),backgroundColor:css('--a')}];
+  chart('c1','bar',L,one(wd,i=>S.by_weekday[i].pf));
+  chart('c2','bar',L,one(wd,i=>S.by_weekday[i].win_rate),{min:0,max:100});
+  const ms=Object.keys(S.by_month).sort();
+  chart('c3','bar',ms,one(ms,mo=>S.by_month[mo]?S.by_month[mo].pf:null));
 }
 
 /* ---- 直近n日の日別損益（equityの差分から算出。取引のない日は0） ---- */
@@ -328,7 +393,7 @@ async function load(){
     const r=await fetch(url,{headers:{Authorization:'Bearer '+tok},cache:'no-store'});
     if(r.status===401){msg('トークンが違います。設定を確認してください。');openDlg();return;}
     if(!r.ok)throw new Error('HTTP '+r.status);
-    D=await r.json();msg('');render();
+    D=combine(await r.json());msg('');render();
   }catch(e){msg('取得に失敗しました（'+e.message+'）。URLと通信状態を確認してください。');}
 }
 function openDlg(){$('#u').value=LS.getItem('fx_url')||'';$('#t').value=LS.getItem('fx_tok')||'';
