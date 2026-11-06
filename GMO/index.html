@@ -74,6 +74,8 @@ dialog input{display:block;width:100%;margin-top:4px;padding:8px;font-size:16px;
     <div class="chips" id="chipsEq"></div>
     <div class="tf" id="tfBox">
       <button id="tfI">1時間足</button><button id="tfD">日足</button>
+      <span style="flex:1"></span>
+      <button id="ctC">ローソク</button><button id="ctL">ライン</button>
     </div>
     <div class="chead"><span class="nm" id="cName">—</span><span id="cLast"></span></div>
     <canvas id="cv"></canvas>
@@ -235,16 +237,18 @@ function openDlg(){
 /* ---- チャート ---- */
 const CHARTS_URL='https://fx.camelliab1.com/public/charts.json';
 let CH=null, chSel={kind:'fx',key:'USD_JPY',tf:'intra'};
+let chType=LS.getItem('fx_chart_type')||'candle';
 const cssv=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const ohlc=r=>r.length>=5?{o:r[1],h:r[2],l:r[3],c:r[4]}:{o:r[1],h:r[1],l:r[1],c:r[1]}; // 旧形式 [date, close] にも対応
 function chSeries(){
   if(!CH)return null;
   if(chSel.kind==='fx'){
     const d=(CH.fx||{})[chSel.key]; if(!d)return null;
-    if(chSel.tf==='intra')return {label:d.label,last:d.last,chg:d.chg_pct,pts:(d.intraday||[]).map(r=>{const t=new Date(r[0]);return [(t.getMonth()+1)+'/'+t.getDate()+' '+String(t.getHours()).padStart(2,'0')+':00',r[4]];})};
-    return {label:d.label,last:d.last,chg:d.chg_pct,pts:(d.daily||[]).map(r=>[String(r[0]).slice(5),r[4]])};
+    if(chSel.tf==='intra')return {label:d.label,last:d.last,chg:d.chg_pct,pts:(d.intraday||[]).map(r=>{const t=new Date(r[0]);return {lab:(t.getMonth()+1)+'/'+t.getDate()+' '+String(t.getHours()).padStart(2,'0')+':00',...ohlc(r)};})};
+    return {label:d.label,last:d.last,chg:d.chg_pct,pts:(d.daily||[]).map(r=>({lab:String(r[0]).slice(5),...ohlc(r)}))};
   }
   const d=(CH.eq||{})[chSel.key]; if(!d)return null;
-  return {label:d.label,last:d.last,chg:d.chg_pct,pts:(d.daily||[]).map(r=>[String(r[0]).slice(5),r[1]])};
+  return {label:d.label,last:d.last,chg:d.chg_pct,pts:(d.daily||[]).map(r=>({lab:String(r[0]).slice(5),...ohlc(r)}))};
 }
 function drawChart(){
   const cv=$('#cv'); if(!cv||!cv.getContext)return;
@@ -256,21 +260,32 @@ function drawChart(){
   if(!s||s.pts.length<2){$('#cName').textContent='データがありません';$('#cLast').textContent='';return;}
   $('#cName').textContent=s.label;
   $('#cLast').innerHTML=`<b class="big">${num(s.last, s.last&&Math.abs(s.last)<10?3:2)}</b> <span class="${cls(s.chg)}">${s.chg==null?'':(s.chg>0?'+':'')+s.chg+'%'}</span>`;
-  const vs=s.pts.map(p=>p[1]);
-  let mn=Math.min(...vs), mx=Math.max(...vs);
+  const pts=s.pts;
+  let mn=Math.min(...pts.map(p=>chType==='candle'?p.l:p.c)), mx=Math.max(...pts.map(p=>chType==='candle'?p.h:p.c));
   const pad=(mx-mn)*0.08||1; mn-=pad; mx+=pad;
-  const L=6,R=6,T=16,B=18, iw=W-L-R, ih=H-T-B;
-  const X=i=>L+iw*i/(vs.length-1), Y=v=>T+ih*(1-(v-mn)/(mx-mn));
+  const L=6,R=6,T=16,B=18, iw=W-L-R, ih=H-T-B, n=pts.length;
+  const X=i=>L+iw*(n===1?0.5:i/(n-1)), Y=v=>T+ih*(1-(v-mn)/(mx-mn));
   x.strokeStyle=cssv('--line'); x.fillStyle=cssv('--mute'); x.font='11px sans-serif'; x.lineWidth=1;
   for(let i=0;i<=2;i++){const v=mn+(mx-mn)*i/2, y=Y(v); x.beginPath(); x.moveTo(L,y); x.lineTo(W-R,y); x.stroke(); x.fillText(num(v,Math.abs(v)<10?3:2),L,y-3);}
-  x.fillText(s.pts[0][0],L,H-4);
-  const lastLab=s.pts[s.pts.length-1][0];
+  x.fillText(pts[0].lab,L,H-4);
+  const lastLab=pts[n-1].lab;
   x.fillText(lastLab,W-R-x.measureText(lastLab).width,H-4);
-  const up=vs[vs.length-1]>=vs[0];
-  x.strokeStyle=up?cssv('--gain'):cssv('--loss'); x.lineWidth=1.6; x.beginPath();
-  vs.forEach((v,i)=>{i?x.lineTo(X(i),Y(v)):x.moveTo(X(i),Y(v));});
-  x.stroke();
-  x.fillStyle=x.strokeStyle; x.beginPath(); x.arc(X(vs.length-1),Y(vs[vs.length-1]),2.6,0,7); x.fill();
+  if(chType==='candle'){
+    const bw=Math.max(1,Math.min(11,iw/n*0.62)), gcol=cssv('--gain'), lcol=cssv('--loss');
+    pts.forEach((p,i)=>{
+      const col=p.c>=p.o?gcol:lcol, cx=X(i);
+      x.strokeStyle=col; x.fillStyle=col; x.lineWidth=1;
+      x.beginPath(); x.moveTo(cx,Y(p.h)); x.lineTo(cx,Y(p.l)); x.stroke();
+      const y1=Y(Math.max(p.o,p.c)), y2=Y(Math.min(p.o,p.c));
+      x.fillRect(cx-bw/2, y1, bw, Math.max(1,y2-y1));
+    });
+  }else{
+    const vs=pts.map(p=>p.c), up=vs[n-1]>=vs[0];
+    x.strokeStyle=up?cssv('--gain'):cssv('--loss'); x.lineWidth=1.6; x.beginPath();
+    vs.forEach((v,i)=>{i?x.lineTo(X(i),Y(v)):x.moveTo(X(i),Y(v));});
+    x.stroke();
+    x.fillStyle=x.strokeStyle; x.beginPath(); x.arc(X(n-1),Y(vs[n-1]),2.6,0,7); x.fill();
+  }
 }
 function renderChips(){
   const mk=(box,entries,kind)=>{box.innerHTML=entries.map(([k,v])=>
@@ -279,12 +294,17 @@ function renderChips(){
   mk($('#chipsFx'),Object.entries(CH.fx||{}),'fx');
   mk($('#chipsEq'),Object.entries(CH.eq||{}),'eq');
   document.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{chSel.kind=b.dataset.kind;chSel.key=b.dataset.key;renderChips();drawChart();});
-  $('#tfBox').style.display=chSel.kind==='fx'?'flex':'none';
   $('#tfI').className=chSel.tf==='intra'?'on':'';
   $('#tfD').className=chSel.tf==='daily'?'on':'';
+  $('#tfI').style.display=chSel.kind==='fx'?'':'none';
+  $('#tfD').style.display=chSel.kind==='fx'?'':'none';
+  $('#ctC').className=chType==='candle'?'on':'';
+  $('#ctL').className=chType==='line'?'on':'';
 }
 $('#tfI').onclick=()=>{chSel.tf='intra';renderChips();drawChart();};
 $('#tfD').onclick=()=>{chSel.tf='daily';renderChips();drawChart();};
+$('#ctC').onclick=()=>{chType='candle';LS.setItem('fx_chart_type',chType);renderChips();drawChart();};
+$('#ctL').onclick=()=>{chType='line';LS.setItem('fx_chart_type',chType);renderChips();drawChart();};
 async function loadCharts(){
   try{
     const r=await fetch(CHARTS_URL,{cache:'no-store'});
