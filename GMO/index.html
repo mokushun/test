@@ -43,6 +43,15 @@ dialog::backdrop{background:#0006}
 dialog label{display:block;margin:12px 0;font-size:13px;color:var(--mute)}
 dialog input{display:block;width:100%;margin-top:4px;padding:8px;font-size:16px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px}
 .pri{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px}
+.chip{font-size:13px;padding:4px 10px;border-radius:999px}
+.chip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.tf{display:flex;gap:6px;margin:8px 0}
+.tf button{font-size:13px;padding:4px 10px}
+.tf button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+#cv{width:100%;height:220px;display:block;background:var(--sf);border:1px solid var(--line);border-radius:8px}
+.chead{display:flex;justify-content:space-between;align-items:baseline;margin-top:12px}
+.chead .nm{font-size:18px;font-weight:700}
 </style>
 </head>
 <body>
@@ -59,6 +68,17 @@ dialog input{display:block;width:100%;margin-top:4px;padding:8px;font-size:16px;
   <h2 class="brk">OANDA <span class="m" id="updO"></span></h2>
   <div id="acctO"></div>
   <section id="posO"><p class="m">読み込み中…</p></section>
+  <h2 class="brk">チャート <span class="m" id="updC"></span></h2>
+  <section id="chart">
+    <div class="chips" id="chipsFx"></div>
+    <div class="chips" id="chipsEq"></div>
+    <div class="tf" id="tfBox">
+      <button id="tfI">1時間足</button><button id="tfD">日足</button>
+    </div>
+    <div class="chead"><span class="nm" id="cName">—</span><span id="cLast"></span></div>
+    <canvas id="cv"></canvas>
+    <p class="m" id="cNote">FX は GMO のレート（BID）。日足は 06:00 区切りの取引日で合成。株価指数・ETF は遅延データ（約15分）。</p>
+  </section>
   <p class="m" style="margin-top:24px">GMO の含み損益は価格分のみ。スワップは別掲し、「含み＋スワップ」で合計も表示します。GMO の建玉は全件を仲値買い (GMO) として集計しています。</p>
 </main>
 <dialog id="dlg">
@@ -212,7 +232,72 @@ function openDlg(){
   $('#ug').value=c.gUrl; $('#uo').value=c.oUrl; $('#t').value=LS.getItem('gmo_fx_tok')||'';
   $('#dlg').showModal();
 }
-$('#rf').onclick=load;
+/* ---- チャート ---- */
+const CHARTS_URL='https://fx.camelliab1.com/public/charts.json';
+let CH=null, chSel={kind:'fx',key:'USD_JPY',tf:'intra'};
+const cssv=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function chSeries(){
+  if(!CH)return null;
+  if(chSel.kind==='fx'){
+    const d=(CH.fx||{})[chSel.key]; if(!d)return null;
+    if(chSel.tf==='intra')return {label:d.label,last:d.last,chg:d.chg_pct,pts:(d.intraday||[]).map(r=>{const t=new Date(r[0]);return [(t.getMonth()+1)+'/'+t.getDate()+' '+String(t.getHours()).padStart(2,'0')+':00',r[4]];})};
+    return {label:d.label,last:d.last,chg:d.chg_pct,pts:(d.daily||[]).map(r=>[String(r[0]).slice(5),r[4]])};
+  }
+  const d=(CH.eq||{})[chSel.key]; if(!d)return null;
+  return {label:d.label,last:d.last,chg:d.chg_pct,pts:(d.daily||[]).map(r=>[String(r[0]).slice(5),r[1]])};
+}
+function drawChart(){
+  const cv=$('#cv'); if(!cv||!cv.getContext)return;
+  const s=chSeries();
+  const dpr=window.devicePixelRatio||1, W=cv.clientWidth, H=cv.clientHeight;
+  if(!W||!H)return;
+  cv.width=W*dpr; cv.height=H*dpr;
+  const x=cv.getContext('2d'); x.scale(dpr,dpr); x.clearRect(0,0,W,H);
+  if(!s||s.pts.length<2){$('#cName').textContent='データがありません';$('#cLast').textContent='';return;}
+  $('#cName').textContent=s.label;
+  $('#cLast').innerHTML=`<b class="big">${num(s.last, s.last&&Math.abs(s.last)<10?3:2)}</b> <span class="${cls(s.chg)}">${s.chg==null?'':(s.chg>0?'+':'')+s.chg+'%'}</span>`;
+  const vs=s.pts.map(p=>p[1]);
+  let mn=Math.min(...vs), mx=Math.max(...vs);
+  const pad=(mx-mn)*0.08||1; mn-=pad; mx+=pad;
+  const L=6,R=6,T=16,B=18, iw=W-L-R, ih=H-T-B;
+  const X=i=>L+iw*i/(vs.length-1), Y=v=>T+ih*(1-(v-mn)/(mx-mn));
+  x.strokeStyle=cssv('--line'); x.fillStyle=cssv('--mute'); x.font='11px sans-serif'; x.lineWidth=1;
+  for(let i=0;i<=2;i++){const v=mn+(mx-mn)*i/2, y=Y(v); x.beginPath(); x.moveTo(L,y); x.lineTo(W-R,y); x.stroke(); x.fillText(num(v,Math.abs(v)<10?3:2),L,y-3);}
+  x.fillText(s.pts[0][0],L,H-4);
+  const lastLab=s.pts[s.pts.length-1][0];
+  x.fillText(lastLab,W-R-x.measureText(lastLab).width,H-4);
+  const up=vs[vs.length-1]>=vs[0];
+  x.strokeStyle=up?cssv('--gain'):cssv('--loss'); x.lineWidth=1.6; x.beginPath();
+  vs.forEach((v,i)=>{i?x.lineTo(X(i),Y(v)):x.moveTo(X(i),Y(v));});
+  x.stroke();
+  x.fillStyle=x.strokeStyle; x.beginPath(); x.arc(X(vs.length-1),Y(vs[vs.length-1]),2.6,0,7); x.fill();
+}
+function renderChips(){
+  const mk=(box,entries,kind)=>{box.innerHTML=entries.map(([k,v])=>
+    `<button class="chip ${chSel.kind===kind&&chSel.key===k?'on':''}" data-kind="${kind}" data-key="${k}">${v.label||k}</button>`).join('');};
+  if(!CH)return;
+  mk($('#chipsFx'),Object.entries(CH.fx||{}),'fx');
+  mk($('#chipsEq'),Object.entries(CH.eq||{}),'eq');
+  document.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{chSel.kind=b.dataset.kind;chSel.key=b.dataset.key;renderChips();drawChart();});
+  $('#tfBox').style.display=chSel.kind==='fx'?'flex':'none';
+  $('#tfI').className=chSel.tf==='intra'?'on':'';
+  $('#tfD').className=chSel.tf==='daily'?'on':'';
+}
+$('#tfI').onclick=()=>{chSel.tf='intra';renderChips();drawChart();};
+$('#tfD').onclick=()=>{chSel.tf='daily';renderChips();drawChart();};
+async function loadCharts(){
+  try{
+    const r=await fetch(CHARTS_URL,{cache:'no-store'});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    CH=await r.json();
+    updLine($('#updC'),CH.generated_at);
+    renderChips(); drawChart();
+  }catch(e){
+    $('#cName').textContent='チャートを取得できませんでした（'+e.message+'）';
+  }
+}
+window.addEventListener('resize',()=>drawChart());
+$('#rf').onclick=()=>{load();loadCharts();};
 $('#st').onclick=openDlg;
 $('#no').onclick=()=>$('#dlg').close();
 $('#ok').onclick=()=>{
@@ -221,9 +306,10 @@ $('#ok').onclick=()=>{
   LS.setItem('gmo_fx_tok',$('#t').value.trim());
   $('#dlg').close(); load();
 };
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)load();});
-setInterval(()=>{if(!document.hidden)load();},5*60e3);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){load();loadCharts();}});
+setInterval(()=>{if(!document.hidden){load();loadCharts();}},5*60e3);
 load();
+loadCharts();
 </script>
 </body>
 </html>
