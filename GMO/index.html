@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>FX Monitor - GMO</title>
+<title>FX Monitor</title>
 <meta name="theme-color" content="#1b2430">
 <style>
 :root{--bg:#f5f6f8;--sf:#fff;--ink:#1b2430;--mute:#6b7685;--line:#e1e5ea;--gain:#1f6fd1;--loss:#d4432b;--b:#e08a00}
@@ -16,15 +16,15 @@ header h1{font-size:17px;margin:0;flex:1}
 button{font:inherit;color:var(--ink);background:var(--sf);border:1px solid var(--line);border-radius:6px;padding:5px 12px}
 .m{color:var(--mute);font-size:13px}
 .g{color:var(--gain)}.l{color:var(--loss)}.w{color:var(--b)}
-#msg{padding:0 14px;max-width:860px;margin:2px auto;font-size:13px;color:var(--loss)}
-#acct{max-width:860px;margin:6px auto 0;padding:0 14px}
-.al{padding:8px 12px;border-radius:6px;font-size:14px;font-weight:700;background:var(--sf);border:1px solid var(--line)}
+.al{padding:8px 12px;border-radius:6px;font-size:14px;font-weight:700;background:var(--sf);border:1px solid var(--line);margin-top:6px}
 .al.warn{color:var(--b);border-color:var(--b)}.al.bad{color:var(--loss);border-color:var(--loss)}
 main{padding-bottom:40px}
 h2{font-size:14px;margin:22px 0 4px}
+h2.brk{font-size:16px;margin:28px 0 0;padding-bottom:6px;border-bottom:2px solid var(--ink);display:flex;justify-content:space-between;align-items:baseline}
+h2.brk .m{font-weight:400}
 .kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:12px 16px;margin:16px 0}
 .kpi span{display:block;color:var(--mute);font-size:12px}
-.kpi b{font-size:19px}
+.kpi b{font-size:19px;overflow-wrap:anywhere}
 .big{font-size:22px}
 .r{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:7px 0;border-bottom:1px solid var(--line)}
 .r>span:first-child{flex:1}
@@ -37,6 +37,7 @@ th,td{padding:7px 0;border-bottom:1px solid var(--line);text-align:right}
 th:first-child,td:first-child{text-align:left}
 th{font-weight:600;font-size:13px}
 .wrap{overflow-x:auto}.wrap td,.wrap th{white-space:nowrap;padding-left:8px}
+.err{color:var(--loss);font-size:13px;margin-top:10px}
 dialog{border:1px solid var(--line);border-radius:8px;background:var(--sf);color:var(--ink);width:min(92vw,420px)}
 dialog::backdrop{background:#0006}
 dialog label{display:block;margin:12px 0;font-size:13px;color:var(--mute)}
@@ -46,47 +47,78 @@ dialog input{display:block;width:100%;margin-top:4px;padding:8px;font-size:16px;
 </head>
 <body>
 <header>
-  <h1>FX Monitor - GMO</h1>
-  <span class="m" id="upd"></span>
+  <h1>FX Monitor</h1>
   <button id="rf" aria-label="更新">更新</button>
   <button id="st" aria-label="設定">設定</button>
 </header>
-<div id="msg"></div>
-<div id="acct"></div>
 <main>
-  <section id="pos"></section>
-  <p class="m" style="margin-top:24px">含み損益は価格分のみ。スワップは別掲し、「含み＋スワップ」で合計も表示します。建玉は全件を仲値買い (GMO) として集計しています（v1）。</p>
+  <section id="sum"></section>
+  <h2 class="brk">GMOコイン FX <span class="m" id="updG"></span></h2>
+  <div id="acctG"></div>
+  <section id="posG"><p class="m">読み込み中…</p></section>
+  <h2 class="brk">OANDA <span class="m" id="updO"></span></h2>
+  <div id="acctO"></div>
+  <section id="posO"><p class="m">読み込み中…</p></section>
+  <p class="m" style="margin-top:24px">GMO の含み損益は価格分のみ。スワップは別掲し、「含み＋スワップ」で合計も表示します。GMO の建玉は全件を仲値買い (GMO) として集計しています。</p>
 </main>
 <dialog id="dlg">
   <h2 style="margin-top:0">接続設定</h2>
-  <label>データのURL<input id="u" placeholder="https://example.com/gmo/gmo_stats.json" autocapitalize="off" autocorrect="off"></label>
-  <label>トークン<input id="t" type="password" autocomplete="off"></label>
+  <label>GMO データのURL<input id="ug" autocapitalize="off" autocorrect="off"></label>
+  <label>OANDA データのURL<input id="uo" autocapitalize="off" autocorrect="off"></label>
+  <label>トークン（共通）<input id="t" type="password" autocomplete="off"></label>
   <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
     <button id="no">閉じる</button><button id="ok" class="pri">保存して取得</button>
   </div>
 </dialog>
 <script>
 const $=s=>document.querySelector(s), LS=localStorage;
-let D=null;
+let G=null, O=null;
+const DEF_G='https://fx.camelliab1.com/oanda/gmo_stats.json';
+const DEF_O='https://fx.camelliab1.com/oanda/stats.json';
 const num=(v,d=0)=>v==null?'—':Number(v).toLocaleString('ja-JP',{minimumFractionDigits:d,maximumFractionDigits:d});
 const yen=v=>v==null?'—':num(v,Math.abs(v)<100&&v%1?2:0);
 const sgn=v=>v==null?'—':(v>0?'+':'')+yen(v);
 const cls=v=>v>0?'g':v<0?'l':'';
-const msg=t=>$('#msg').textContent=t;
 const MR_WARN=500, MR_BAD=300;
 const mrCls=r=>r==null?'':r<MR_BAD?'l':r<MR_WARN?'w':'';
-function rAcct(){
-  const a=D&&D.account, box=$('#acct'), r=a&&a.margin_ratio;
-  if(r==null||r>=MR_WARN){box.innerHTML='';return;}
-  box.innerHTML=`<div class="al ${r<MR_BAD?'bad':'warn'}">維持率 ${num(r)}%　${r<MR_BAD?'要対応（'+MR_BAD+'%未満）':'新規停止ライン（'+MR_WARN+'%）を下回っています'}</div>`;
+function cfg(){
+  return {
+    gUrl: LS.getItem('gmo_fx_url')||DEF_G,
+    oUrl: LS.getItem('fx_oanda_url')||DEF_O,
+    tok:  LS.getItem('gmo_fx_tok')||LS.getItem('fx_tok')||''
+  };
 }
 function fmtT(iso){
   if(!iso)return '—';
   const d=new Date(iso);
   return d.toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
 }
-function rPos(){
-  const p=D.positions, t=p.total, a=D.account||{};
+function updLine(el,iso){
+  if(!iso){el.textContent='';return;}
+  const t=new Date(iso);
+  el.textContent=fmtT(iso)+' 更新';
+  el.className='m '+((Date.now()-t>30*60e3)?'l':'');
+}
+function alertHtml(a){
+  const r=a&&a.margin_ratio;
+  if(r==null||r>=MR_WARN)return '';
+  return `<div class="al ${r<MR_BAD?'bad':'warn'}">維持率 ${num(r)}%　${r<MR_BAD?'要対応（'+MR_BAD+'%未満）':'新規停止ライン（'+MR_WARN+'%）を下回っています'}</div>`;
+}
+/* ---- 合計 ---- */
+function rSum(){
+  if(!G||!O){$('#sum').innerHTML='';return;}
+  const nav=(G.account.nav||0)+(O.account.nav||0);
+  const un=(G.positions.total.unrealized||0)+(O.positions.total.unrealized||0);
+  $('#sum').innerHTML=`<div class="kpi">`+
+    `<div><span>純資産（合計）</span><b>${yen(nav)}</b></div>`+
+    `<div><span>含み損益（合計・GMOは価格分）</span><b class="${cls(un)}">${sgn(un)}</b></div></div>`;
+}
+/* ---- GMO ---- */
+function rG(){
+  if(!G)return;
+  updLine($('#updG'),G.generated_at);
+  $('#acctG').innerHTML=alertHtml(G.account);
+  const p=G.positions, t=p.total, a=G.account||{};
   let h=`<div class="kpi">`+
     `<div><span>含み損益（価格）</span><b class="big ${cls(t.unrealized)}">${sgn(t.unrealized)}</b></div>`+
     `<div><span>スワップ</span><b class="${cls(t.swap)}">${sgn(t.swap)}</b></div>`+
@@ -97,7 +129,8 @@ function rPos(){
     `<div><span>残高</span><b>${yen(a.balance)}</b></div>`+
     `<div><span>必要証拠金</span><b>${yen(a.margin_used)}</b></div>`+
     `<div><span>取引余力</span><b>${yen(a.available)}</b></div></div>`;
-  if(D.errors&&D.errors.length)h+=`<p class="m" style="color:var(--loss)">取得エラー: ${D.errors.join(' / ')}</p>`;
+  if(G.errors&&G.errors.length)h+=`<p class="err">取得エラー: ${G.errors.join(' / ')}</p>`;
+  if(G.history)h+=`<p class="m">約定の蓄積: 累計 ${num(G.history.executions_total)}件（決済 ${num(G.history.closed_total)}件）</p>`;
   const bt=Object.entries(p.by_tag||{});
   if(bt.length){
     h+='<h2>手法別</h2>'+bt.map(([k,v])=>
@@ -113,33 +146,81 @@ function rPos(){
       [...p.detail].sort((x,y)=>String(x.open_time||'').localeCompare(String(y.open_time||''))).map(d=>
       `<tr><td>${d.instrument.replace('_','/')}</td><td>${d.side==='long'?'買':'売'}</td><td>${num(d.units)}</td><td>${d.price}</td><td class="${cls(d.unrealized)}">${sgn(d.unrealized)}</td><td class="${cls(d.swap)}">${sgn(d.swap)}</td><td>${fmtT(d.open_time)}</td><td>${d.position_id}</td></tr>`).join('')+'</table></div>';
   }
-  const po=D.pending_orders||[];
+  const po=G.pending_orders||[];
   if(po.length)h+='<h2>未約定注文</h2><div class="wrap"><table><tr><th>通貨ペア</th><th>種類</th><th>売買</th><th>数量</th><th>価格</th><th>状態</th><th>タグ</th></tr>'+po.map(o=>`<tr><td>${(o.instrument||'').replace('_','/')}</td><td>${o.type||'-'}</td><td>${+o.units>0?'買':'売'}</td><td>${num(Math.abs(o.units))}</td><td>${o.price??'-'}</td><td>${o.status||'-'}</td><td>${o.tag||'-'}</td></tr>`).join('')+'</table></div>';
-  $('#pos').innerHTML=h;
+  $('#posG').innerHTML=h;
 }
-function render(){
-  rAcct();
-  if(!D)return;
-  const t=new Date(D.generated_at);
-  $('#upd').textContent=t.toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})+' 更新';
-  $('#upd').className='m '+(Date.now()-t>30*60e3?'l':'');
-  rPos();
+/* ---- OANDA（TEST_NAKANE_BUY は NAKANE_BUY に統合して表示） ---- */
+const M_SRC='TEST_NAKANE_BUY', M_DST='NAKANE_BUY', M_LABEL='仲値買い';
+const nz=v=>(v==null||!isFinite(v))?0:v;
+function mergeTag(o){
+  const t=o&&o[M_SRC]; if(!t)return;
+  if(o[M_DST]){const d=o[M_DST];['n','units','unrealized'].forEach(f=>{if(t[f]!=null)d[f]=nz(d[f])+t[f];});}
+  else o[M_DST]=t;
+  if(o[M_DST].label)o[M_DST].label=M_LABEL;
+  delete o[M_SRC];
+}
+function rO(){
+  if(!O)return;
+  updLine($('#updO'),O.generated_at);
+  $('#acctO').innerHTML=alertHtml(O.account);
+  const p=O.positions, t=p.total, a=O.account||{};
+  const lab=k=>(p.by_tag[k]||{}).label||k;
+  let h=`<div class="kpi">`+
+    `<div><span>含み損益（合計）</span><b class="big ${cls(t.unrealized)}">${sgn(t.unrealized)}</b></div>`+
+    `<div><span>保有</span><b>${t.n}件</b></div>`+
+    `<div><span>維持率</span><b class="big ${mrCls(a.margin_ratio)}">${a.margin_ratio==null?'—':num(a.margin_ratio)+'%'}</b></div>`+
+    `<div><span>純資産</span><b>${yen(a.nav)}</b></div>`+
+    `<div><span>必要証拠金</span><b>${yen(a.margin_used)}</b></div></div>`;
+  const bt=Object.entries(p.by_tag||{});
+  if(bt.length){
+    h+='<h2>手法別</h2>'+bt.map(([k,v])=>
+      `<div class="r"><span>${v.label||k}</span><span class="m">${v.n}件</span><b class="${cls(v.unrealized)}">${sgn(v.unrealized)}</b></div>`).join('');
+  }
+  h+='<h2>通貨ペア別（含み損が大きい順）</h2>';
+  if(!p.by_instrument.length)h+='<p class="m">保有ポジションはありません</p>';
+  h+=[...p.by_instrument].sort((x,y)=>x.unrealized-y.unrealized).map(r=>
+    `<div class="pos"><div class="r top"><span><b class="nm">${r.instrument.replace('_','/')}</b> <span class="m">${r.side==='long'?'買':'売'} ${r.n}件・${num(r.units)}通貨・平均${r.avg_price}</span></span><b class="big ${cls(r.unrealized)}">${sgn(r.unrealized)}</b></div>`+
+    Object.entries(r.by_tag||{}).map(([k,v])=>`<div class="r sub"><span>${lab(k)}</span><span class="m">${v.n}件・${num(v.units)}通貨</span><b class="${cls(v.unrealized)}">${sgn(v.unrealized)}</b></div>`).join('')+'</div>').join('');
+  $('#posO').innerHTML=h;
+}
+/* ---- 取得 ---- */
+async function fetchOne(url,tok){
+  const r=await fetch(url,{headers:{Authorization:'Bearer '+tok},cache:'no-store'});
+  if(r.status===401)throw new Error('トークンが違います');
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  return r.json();
 }
 async function load(){
-  const url=LS.getItem('gmo_fx_url'), tok=LS.getItem('gmo_fx_tok')||'';
-  if(!url){openDlg();return;}
-  try{
-    const r=await fetch(url,{headers:{Authorization:'Bearer '+tok},cache:'no-store'});
-    if(r.status===401){msg('トークンが違います。設定を確認してください。');openDlg();return;}
-    if(!r.ok)throw new Error('HTTP '+r.status);
-    D=await r.json();msg('');render();
-  }catch(e){msg('取得に失敗しました（'+e.message+'）。URLと通信状態を確認してください。');}
+  const c=cfg();
+  if(!c.tok){openDlg();return;}
+  const jobs=[
+    fetchOne(c.gUrl,c.tok).then(d=>{if(d.account&&d.account.margin_ratio>1e12)d.account.margin_ratio=null;G=d;rG();})
+      .catch(e=>{$('#posG').innerHTML=`<p class="err">GMO の取得に失敗しました（${e.message}）</p>`;}),
+    fetchOne(c.oUrl,c.tok).then(d=>{
+        const p=d.positions;
+        if(p){mergeTag(p.by_tag);(p.by_instrument||[]).forEach(r=>mergeTag(r.by_tag));}
+        O=d;rO();
+      })
+      .catch(e=>{$('#posO').innerHTML=`<p class="err">OANDA の取得に失敗しました（${e.message}）</p>`;})
+  ];
+  await Promise.all(jobs);
+  rSum();
 }
-function openDlg(){$('#u').value=LS.getItem('gmo_fx_url')||'';$('#t').value=LS.getItem('gmo_fx_tok')||'';$('#dlg').showModal();}
+function openDlg(){
+  const c=cfg();
+  $('#ug').value=c.gUrl; $('#uo').value=c.oUrl; $('#t').value=LS.getItem('gmo_fx_tok')||'';
+  $('#dlg').showModal();
+}
 $('#rf').onclick=load;
 $('#st').onclick=openDlg;
 $('#no').onclick=()=>$('#dlg').close();
-$('#ok').onclick=()=>{LS.setItem('gmo_fx_url',$('#u').value.trim());LS.setItem('gmo_fx_tok',$('#t').value.trim());$('#dlg').close();load();};
+$('#ok').onclick=()=>{
+  LS.setItem('gmo_fx_url',$('#ug').value.trim()||DEF_G);
+  LS.setItem('fx_oanda_url',$('#uo').value.trim()||DEF_O);
+  LS.setItem('gmo_fx_tok',$('#t').value.trim());
+  $('#dlg').close(); load();
+};
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)load();});
 setInterval(()=>{if(!document.hidden)load();},5*60e3);
 load();
