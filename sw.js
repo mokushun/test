@@ -1,5 +1,5 @@
 // アプリ本体(HTML/アイコン/Chart.js)だけをキャッシュする。損益データ(VPS側)は一切キャッシュしない。
-const CACHE = 'fx-monitor-v2';
+const CACHE = 'fx-monitor-v3';
 const SHELL = ['./', 'index.html', 'manifest.json', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {

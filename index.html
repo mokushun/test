@@ -22,8 +22,7 @@ button,select{font:inherit;color:var(--ink);background:var(--sf);border:1px soli
 .m{color:var(--mute);font-size:13px}
 .g{color:var(--gain)}.l{color:var(--loss)}
 #msg{padding:0 14px;max-width:860px;margin:2px auto;font-size:13px;color:var(--loss)}
-#acct{max-width:860px;margin:6px auto 0;padding:0 14px}
-.al{padding:8px 12px;border-radius:6px;font-size:14px;font-weight:700;background:var(--sf);border:1px solid var(--line)}
+.al{padding:8px 12px;border-radius:6px;font-size:14px;font-weight:700;background:var(--sf);border:1px solid var(--line);margin-top:6px}
 .al.warn{color:var(--b);border-color:var(--b)}.al.bad{color:var(--loss);border-color:var(--loss)}
 .w{color:var(--b)}
 nav{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-top:8px;overflow-x:auto}
@@ -32,9 +31,11 @@ nav button.on{color:var(--ink);border-bottom-color:var(--ink);font-weight:600}
 main{padding-bottom:40px}
 .pane{display:none}.pane.on{display:block}
 h2{font-size:14px;margin:22px 0 4px}
+h2.brk{font-size:16px;margin:28px 0 0;padding-bottom:6px;border-bottom:2px solid var(--ink);display:flex;justify-content:space-between;align-items:baseline}
+h2.brk .m{font-weight:400}
 .kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:12px 16px;margin:16px 0}
 .kpi span{display:block;color:var(--mute);font-size:12px}
-.kpi b{font-size:19px}
+.kpi b{font-size:19px;overflow-wrap:anywhere}
 .big{font-size:22px}
 .r{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:7px 0;border-bottom:1px solid var(--line)}
 .r>span:first-child{flex:1}
@@ -48,6 +49,7 @@ th:first-child,td:first-child{text-align:left}
 th{font-weight:600;font-size:13px}
 .best{font-weight:700}
 .ch{position:relative;height:220px;margin:4px 0 10px}
+.err{color:var(--loss);font-size:13px;margin-top:10px}
 dialog{border:1px solid var(--line);border-radius:8px;background:var(--sf);color:var(--ink);width:min(92vw,420px)}
 dialog::backdrop{background:#0006}
 dialog label{display:block;margin:12px 0;font-size:13px;color:var(--mute)}
@@ -55,7 +57,9 @@ dialog input{display:block;width:100%;margin-top:4px;padding:8px;font-size:16px;
 .pri{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 #bar{padding:6px 10px;border-radius:6px;font-size:13px;margin:12px 0 8px;background:var(--sf)}
 #bar.bad{color:var(--loss);font-weight:700}
-.tf button.on{background:var(--ink);color:var(--bg)}
+.tf{display:flex;gap:6px;margin:8px 0;align-items:center;flex-wrap:wrap}
+.tf button{font-size:13px;padding:4px 10px}
+.tf button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
 .grid.wide{grid-template-columns:repeat(auto-fill,minmax(min(100%,600px),1fr))}
 #syms{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
@@ -65,17 +69,21 @@ dialog input{display:block;width:100%;margin-top:4px;padding:8px;font-size:16px;
 .lc{height:240px}
 .lg span{font-size:11px;font-weight:700;margin-right:8px}
 .wrap{overflow-x:auto}.wrap td,.wrap th{white-space:nowrap;padding-left:8px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px}
+.chip{font-size:13px;padding:4px 10px;border-radius:999px}
+.chip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+#cv{width:100%;height:240px;display:block;background:var(--sf);border:1px solid var(--line);border-radius:8px}
+.chead{display:flex;justify-content:space-between;align-items:baseline;margin-top:12px}
+.chead .nm{font-size:18px;font-weight:700}
 </style>
 </head>
 <body>
 <header>
   <h1>FX Monitor</h1>
-  <span class="m" id="upd"></span>
   <button id="rf" aria-label="更新">更新</button>
   <button id="st" aria-label="設定">設定</button>
 </header>
 <div id="msg"></div>
-<div id="acct"></div>
 <nav>
   <button data-t="pos" class="on">ポジション</button>
   <button data-t="chart">チャート</button>
@@ -83,14 +91,43 @@ dialog input{display:block;width:100%;margin-top:4px;padding:8px;font-size:16px;
   <button data-t="str">手法別</button>
 </nav>
 <main>
-  <section id="pos" class="pane on"></section>
+  <section id="pos" class="pane on">
+    <div id="sum"></div>
+    <h2 class="brk">GMOコイン FX（主） <span class="m" id="updG"></span></h2>
+    <div id="acctG"></div>
+    <section id="posG"><p class="m">読み込み中…</p></section>
+    <h2 class="brk">OANDA（副） <span class="m" id="updO"></span></h2>
+    <div id="acctO"></div>
+    <section id="posO"><p class="m">読み込み中…</p></section>
+    <p class="m" style="margin-top:24px">GMO の含み損益は価格分のみ。スワップは別掲し、「含み＋スワップ」で合計も表示します。GMO の建玉は全件を仲値買い (GMO) として集計しています。</p>
+  </section>
   <section id="chart" class="pane">
-    <div id="bar">読み込み中…</div>
-    <div class="tf"><button data-tf="H1" class="on">H1</button> <button data-tf="D1">D1</button></div>
-    <div id="candles" class="grid" style="margin-top:8px"></div>
-    <h2>通貨強弱</h2><div id="strength" class="grid wide"></div>
+    <div class="tf" id="csBox">
+      <button data-cs="gmo" class="on">GMO（charts.json）</button>
+      <button data-cs="oanda">OANDA（H1/D1・通貨強弱）</button>
+    </div>
+    <div id="chartGmo">
+      <div class="m" id="updC"></div>
+      <div class="chips" id="chipsFx"></div>
+      <div class="chips" id="chipsEq"></div>
+      <div class="tf" id="tfBox">
+        <button id="tfI">1時間足</button><button id="tfD">日足</button>
+        <span style="flex:1"></span>
+        <button id="ctC">ローソク</button><button id="ctL">ライン</button>
+      </div>
+      <div class="chead"><span class="nm" id="cName">—</span><span id="cLast"></span></div>
+      <canvas id="cv"></canvas>
+      <p class="m" id="cNote">FX は GMO のレート（BID）。日足は 06:00 区切りの取引日で合成。株価指数・ETF は遅延データ（約15分）。</p>
+    </div>
+    <div id="chartOanda" style="display:none">
+      <div id="bar">読み込み中…</div>
+      <div class="tf"><button data-tf="H1" class="on">H1</button> <button data-tf="D1">D1</button></div>
+      <div id="candles" class="grid" style="margin-top:8px"></div>
+      <h2>通貨強弱</h2><div id="strength" class="grid wide"></div>
+    </div>
   </section>
   <section id="cmp" class="pane">
+    <h2 class="brk">仲値（OANDA実績）</h2>
     <div id="cmpT"></div>
     <h2>決済曜日別のPF</h2><div class="ch"><canvas id="c1"></canvas></div>
     <h2>決済曜日別の勝率（%）</h2><div class="ch"><canvas id="c2"></canvas></div>
@@ -98,6 +135,7 @@ dialog input{display:block;width:100%;margin-top:4px;padding:8px;font-size:16px;
     <p class="m">旧2段買い（TEST_NAKANE_BUY）とNAKANE_BUYを合算した値です。PF・勝率・1万通貨あたり損益は、2手法の値から逆算して合算しているため、わずかにずれることがあります。損失が1件もない区間はPFを計算できないため、棒が出ません。件数が少ない区間は参考程度に見てください。</p>
   </section>
   <section id="str" class="pane">
+    <h2 class="brk">手法別（OANDA実績）</h2>
     <p><select id="sel"></select></p>
     <div id="strK" class="kpi"></div>
     <h2>累積損益</h2><div class="ch"><canvas id="s1"></canvas></div>
@@ -108,9 +146,10 @@ dialog input{display:block;width:100%;margin-top:4px;padding:8px;font-size:16px;
 </main>
 <dialog id="dlg">
   <h2 style="margin-top:0">接続設定</h2>
-  <label>データのURL<input id="u" placeholder="https://example.com/oanda/stats.json" autocapitalize="off" autocorrect="off"></label>
-  <label>トークン<input id="t" type="password" autocomplete="off"></label>
-  <div class="m" style="margin-top:12px">チャートの通貨ペア（4つ）</div><div id="syms"></div>
+  <label>GMO データのURL<input id="ug" autocapitalize="off" autocorrect="off"></label>
+  <label>OANDA データのURL<input id="uo" autocapitalize="off" autocorrect="off"></label>
+  <label>トークン（共通）<input id="t" type="password" autocomplete="off"></label>
+  <div class="m" style="margin-top:12px">チャートの通貨ペア（OANDA側の4つ）</div><div id="syms"></div>
   <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
     <button id="no">閉じる</button><button id="ok" class="pri">保存して取得</button>
   </div>
@@ -119,23 +158,46 @@ dialog input{display:block;width:100%;margin-top:4px;padding:8px;font-size:16px;
 <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 <script>
 const $=s=>document.querySelector(s), LS=localStorage;
-let D=null, tab='pos', charts={};
+let G=null, O=null, tab='pos', charts={};
+let PUB={}, csO={}, ssO={}, oBuilt=false, tf='H1';
+let CH=null, chSel={kind:'fx',key:'USD_JPY',tf:'intra'}, csMode='gmo';
 const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const num=(v,d=0)=>v==null?'—':Number(v).toLocaleString('ja-JP',{minimumFractionDigits:d,maximumFractionDigits:d});
-const sgn=v=>v==null?'—':(v>0?'+':'')+num(v);
+const yen=v=>v==null?'—':num(v,Math.abs(v)<100&&v%1?2:0);
+const sgn=v=>v==null?'—':(v>0?'+':'')+yen(v);
 const cls=v=>v>0?'g':v<0?'l':'';
 const pf=s=>s.pf!=null?s.pf.toFixed(2):(s.gp>0?'∞':'—');
 const pct=v=>v==null?'—':v.toFixed(1)+'%';
 const msg=t=>$('#msg').textContent=t;
-const MR_WARN=500, MR_BAD=300; // 新規停止ライン（両建て・DCA）と、要対応ライン
+const MR_WARN=500, MR_BAD=300; // 新規停止ライン（両建て・DCA）と、要対応ライン。両口座共通
 const mrCls=r=>r==null?'':r<MR_BAD?'l':r<MR_WARN?'w':'';
-function rAcct(){
-  const a=D&&D.account, box=$('#acct'), r=a&&a.margin_ratio;
-  if(r==null||r>=MR_WARN){box.innerHTML='';return;}
-  box.innerHTML=`<div class="al ${r<MR_BAD?'bad':'warn'}">維持率 ${num(r)}%　${r<MR_BAD?'要対応（'+MR_BAD+'%未満）':'新規停止ライン（'+MR_WARN+'%）を下回っています'}</div>`;
+const DEF_G='https://fx.camelliab1.com/oanda/gmo_stats.json';
+const DEF_O='https://fx.camelliab1.com/oanda/stats.json';
+function cfg(){
+  return {
+    gUrl: LS.getItem('gmo_fx_url')||DEF_G,
+    oUrl: LS.getItem('fx_oanda_url')||LS.getItem('fx_url')||DEF_O,
+    tok:  LS.getItem('gmo_fx_tok')||LS.getItem('fx_tok')||''
+  };
+}
+function fmtT(iso){
+  if(!iso)return '—';
+  const d=new Date(iso);
+  return d.toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+function updLine(el,iso){
+  if(!iso){el.textContent='';return;}
+  const t=new Date(iso);
+  el.textContent=fmtT(iso)+' 更新';
+  el.className='m '+((Date.now()-t>30*60e3)?'l':'');
+}
+function alertHtml(a){
+  const r=a&&a.margin_ratio;
+  if(r==null||r>=MR_WARN)return '';
+  return `<div class="al ${r<MR_BAD?'bad':'warn'}">維持率 ${num(r)}%　${r<MR_BAD?'要対応（'+MR_BAD+'%未満）':'新規停止ライン（'+MR_WARN+'%）を下回っています'}</div>`;
 }
 
-/* ---- 仲値2手法の合算（TEST_NAKANE_BUY を NAKANE_BUY に統合する） ---- */
+/* ---- 仲値2手法の合算（TEST_NAKANE_BUY を NAKANE_BUY に統合する。統合版ではここ1か所だけ） ---- */
 const M_SRC='TEST_NAKANE_BUY', M_DST='NAKANE_BUY', M_LABEL='仲値買い';
 const nz=v=>(v==null||!isFinite(v))?0:v;
 // {n,net,pf} から [総利益, 総損失(正の値)] を逆算する
@@ -216,26 +278,79 @@ function chart(id,type,labels,sets,y){
 }
 const signColors=vs=>vs.map(v=>v>=0?css('--gain'):css('--loss'));
 
-/* ---- ポジション ---- */
-function rPos(){
-  const p=D.positions, t=p.total, p_a=D.account;
+/* ---- ポジション: 合計 ---- */
+function rSum(){
+  const gs=G&&G.account, os=O&&O.account;
+  if(!gs&&!os){$('#sum').innerHTML='';return;}
+  const nav=((gs&&gs.nav)||0)+((os&&os.nav)||0);
+  const un=((G&&G.positions&&G.positions.total.unrealized)||0)+((O&&O.positions&&O.positions.total.unrealized)||0);
+  const note=(gs&&os)?'':('（'+(gs?'GMO':'OANDA')+'のみ取得）');
+  $('#sum').innerHTML=`<div class="kpi">`+
+    `<div><span>純資産（合計）${note}</span><b>${yen(nav)}</b></div>`+
+    `<div><span>含み損益（合計・GMOは価格分）</span><b class="${cls(un)}">${sgn(un)}</b></div></div>`;
+}
+/* ---- ポジション: GMO（主） ---- */
+function rG(){
+  if(!G)return;
+  updLine($('#updG'),G.generated_at);
+  $('#acctG').innerHTML=alertHtml(G.account);
+  const p=G.positions, t=p.total, a=G.account||{};
+  let h=`<div class="kpi">`+
+    `<div><span>含み損益（価格）</span><b class="big ${cls(t.unrealized)}">${sgn(t.unrealized)}</b></div>`+
+    `<div><span>スワップ</span><b class="${cls(t.swap)}">${sgn(t.swap)}</b></div>`+
+    `<div><span>含み＋スワップ</span><b class="${cls(t.unrealized_with_swap)}">${sgn(t.unrealized_with_swap)}</b></div>`+
+    `<div><span>保有</span><b>${t.n}件</b></div>`+
+    `<div><span>維持率</span><b class="big ${mrCls(a.margin_ratio)}">${a.margin_ratio==null?'—':num(a.margin_ratio)+'%'}</b></div>`+
+    `<div><span>純資産</span><b>${yen(a.nav)}</b></div>`+
+    `<div><span>残高</span><b>${yen(a.balance)}</b></div>`+
+    `<div><span>必要証拠金</span><b>${yen(a.margin_used)}</b></div>`+
+    `<div><span>取引余力</span><b>${yen(a.available)}</b></div></div>`;
+  if(G.errors&&G.errors.length)h+=`<p class="err">取得エラー: ${G.errors.join(' / ')}</p>`;
+  if(G.history)h+=`<p class="m">約定の蓄積: 累計 ${num(G.history.executions_total)}件（決済 ${num(G.history.closed_total)}件）</p>`;
+  const bt=Object.entries(p.by_tag||{});
+  if(bt.length){
+    h+='<h2>手法別</h2>'+bt.map(([k,v])=>
+      `<div class="r"><span>${v.label||k}</span><span class="m">${v.n}件</span><b class="${cls(v.unrealized)}">${sgn(v.unrealized)}</b></div>`).join('');
+  }
+  h+='<h2>通貨ペア別（含み損が大きい順）</h2>';
+  if(!p.by_instrument.length)h+='<p class="m">保有ポジションはありません</p>';
+  h+=[...p.by_instrument].sort((x,y)=>x.unrealized-y.unrealized).map(r=>
+    `<div class="pos"><div class="r top"><span><b class="nm">${r.instrument.replace('_','/')}</b> <span class="m">${r.side==='long'?'買':'売'} ${r.n}件・${num(r.units)}通貨・平均${r.avg_price}</span></span><b class="big ${cls(r.unrealized)}">${sgn(r.unrealized)}</b></div>`+
+    `<div class="r sub"><span>スワップ</span><b class="${cls(r.swap)}">${sgn(r.swap)}</b></div></div>`).join('');
+  if(p.detail&&p.detail.length){
+    h+='<h2>建玉明細</h2><div class="wrap"><table><tr><th>通貨ペア</th><th>売買</th><th>数量</th><th>建値</th><th>含み損益</th><th>スワップ</th><th>建てた時刻</th><th>建玉ID</th></tr>'+
+      [...p.detail].sort((x,y)=>String(x.open_time||'').localeCompare(String(y.open_time||''))).map(d=>
+      `<tr><td>${d.instrument.replace('_','/')}</td><td>${d.side==='long'?'買':'売'}</td><td>${num(d.units)}</td><td>${d.price}</td><td class="${cls(d.unrealized)}">${sgn(d.unrealized)}</td><td class="${cls(d.swap)}">${sgn(d.swap)}</td><td>${fmtT(d.open_time)}</td><td>${d.position_id}</td></tr>`).join('')+'</table></div>';
+  }
+  const po=G.pending_orders||[];
+  if(po.length)h+='<h2>未約定注文</h2><div class="wrap"><table><tr><th>通貨ペア</th><th>種類</th><th>売買</th><th>数量</th><th>価格</th><th>状態</th><th>タグ</th></tr>'+po.map(o=>`<tr><td>${(o.instrument||'').replace('_','/')}</td><td>${o.type||'-'}</td><td>${+o.units>0?'買':'売'}</td><td>${num(Math.abs(o.units))}</td><td>${o.price??'-'}</td><td>${o.status||'-'}</td><td>${o.tag||'-'}</td></tr>`).join('')+'</table></div>';
+  $('#posG').innerHTML=h;
+}
+/* ---- ポジション: OANDA（副。表示はルート版のまま、合算は combine 済み） ---- */
+function rOPos(){
+  if(!O)return;
+  updLine($('#updO'),O.generated_at);
+  $('#acctO').innerHTML=alertHtml(O.account);
+  const p=O.positions, t=p.total, p_a=O.account;
   const lab=k=>(p.by_tag[k]||{}).label||k;
   let h=`<div class="kpi"><div><span>含み損益（合計）</span><b class="big ${cls(t.unrealized)}">${sgn(t.unrealized)}</b></div><div><span>保有</span><b>${t.n}件</b></div>`+
     (p_a?`<div><span>維持率</span><b class="big ${mrCls(p_a.margin_ratio)}">${p_a.margin_ratio==null?'—':num(p_a.margin_ratio)+'%'}</b></div><div><span>純資産</span><b>${num(p_a.nav)}</b></div><div><span>必要証拠金</span><b>${num(p_a.margin_used)}</b></div>`:'')+'</div>';
   h+='<h2>手法別</h2>'+Object.entries(p.by_tag).map(([k,v])=>
     `<div class="r"><span>${v.label}</span><span class="m">${v.n}件</span><b class="${cls(v.unrealized)}">${sgn(v.unrealized)}</b></div>`).join('');
   h+='<h2>通貨ペア別（含み損が大きい順）</h2>';
+  if(!p.by_instrument.length)h+='<p class="m">保有ポジションはありません</p>';
   h+=[...p.by_instrument].sort((a,b)=>a.unrealized-b.unrealized).map(r=>
     `<div class="pos"><div class="r top"><span><b class="nm">${r.instrument.replace('_','/')}</b> <span class="m">${r.side==='long'?'買':'売'} ${r.n}件・${num(r.units)}通貨・平均${r.avg_price}</span></span><b class="big ${cls(r.unrealized)}">${sgn(r.unrealized)}</b></div>`+
     Object.entries(r.by_tag).map(([k,v])=>`<div class="r sub"><span>${lab(k)}</span><span class="m">${v.n}件・${num(v.units)}通貨</span><b class="${cls(v.unrealized)}">${sgn(v.unrealized)}</b></div>`).join('')+'</div>').join('');
   const po=(PUB.po&&PUB.po.pending_orders)||[];
   if(po.length)h+='<h2>未約定注文</h2><div class="wrap"><table><tr><th>通貨ペア</th><th>種類</th><th>売買</th><th>数量</th><th>価格</th><th>タグ</th></tr>'+po.map(o=>`<tr><td>${o.instrument.replace('_','/')}</td><td>${o.type}</td><td>${+o.units>0?'買':'売'}</td><td>${Math.abs(o.units)}</td><td>${o.price||'-'}</td><td>${o.tag||'-'}</td></tr>`).join('')+'</table></div>';
-  $('#pos').innerHTML=h||'<p class="m">保有ポジションはありません</p>';
+  $('#posO').innerHTML=h;
 }
 
-/* ---- 仲値（曜日別・月別。旧2段買いは合算済み） ---- */
+/* ---- 仲値（OANDA実績。曜日別・月別。旧2段買いは合算済み） ---- */
 function rCmp(){
-  const S=D.strategies[M_DST];
+  if(!O){$('#cmpT').innerHTML='<p class="m">OANDA のデータを取得できていません</p>';return;}
+  const S=O.strategies&&O.strategies[M_DST];
   if(!S){$('#cmpT').innerHTML='<p class="m">仲値のデータがありません</p>';return;}
   const sm=S.summary;
   const rng=S.equity.length?S.equity[0][0].slice(5)+' 〜 '+S.equity[S.equity.length-1][0].slice(5):'—';
@@ -243,7 +358,7 @@ function rCmp(){
     ['平均pips',num(sm.avg_pips,1)],['1万通貨あたり損益',sgn(sm.per10k)]];
   $('#cmpT').innerHTML=`<table><tr><th></th><th style="color:var(--a)">${S.label}</th></tr>`+
     R.map(([n,v])=>`<tr><td>${n}</td><td>${v}</td></tr>`).join('')+'</table>';
-  const wd=[0,1,2,3,4,5,6].filter(i=>S.by_weekday[i]&&S.by_weekday[i].n), L=wd.map(i=>D.weekday_labels[i]);
+  const wd=[0,1,2,3,4,5,6].filter(i=>S.by_weekday[i]&&S.by_weekday[i].n), L=wd.map(i=>O.weekday_labels[i]);
   const one=(keys,get)=>[{label:S.label,data:keys.map(k=>get(k)),backgroundColor:css('--a')}];
   chart('c1','bar',L,one(wd,i=>S.by_weekday[i].pf));
   chart('c2','bar',L,one(wd,i=>S.by_weekday[i].win_rate),{min:0,max:100});
@@ -265,14 +380,15 @@ function recent(eq,n){
   }
   return {labels,daily,cum,total:c};
 }
-/* ---- 手法別 ---- */
+/* ---- 手法別（OANDA実績） ---- */
 function rStr(){
+  if(!O){$('#strK').innerHTML='<p class="m">OANDA のデータを取得できていません</p>';return;}
   const sel=$('#sel'), keep=sel.value;
-  const ent=Object.entries(D.strategies).sort((a,b)=>(b[0]==='ALL')-(a[0]==='ALL')); // 合計を先頭に
+  const ent=Object.entries(O.strategies).sort((a,b)=>(b[0]==='ALL')-(a[0]==='ALL')); // 合計を先頭に
   sel.innerHTML=ent.map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('');
-  sel.value=D.strategies[keep]?keep:(D.strategies.ALL?'ALL':ent[0][0]);
-  const k=sel.value, S=D.strategies[k], m=S.summary;
-  const un=k==='ALL'?D.positions.total.unrealized:(D.positions.by_tag[k]||{}).unrealized;
+  sel.value=O.strategies[keep]?keep:(O.strategies.ALL?'ALL':ent[0][0]);
+  const k=sel.value, S=O.strategies[k], m=S.summary;
+  const un=k==='ALL'?O.positions.total.unrealized:(O.positions.by_tag[k]||{}).unrealized;
   const K=[['確定損益',sgn(m.net),cls(m.net)],['PF',pf(m)],['勝率',pct(m.win_rate)],['件数',num(m.n)],['平均pips',num(m.avg_pips,1)],['最大ドローダウン',num(m.max_dd)],['スワップ計',sgn(m.swap),cls(m.swap)]];
   if(un!=null)K.push(['含み損益',sgn(un),cls(un)],['確定＋含み',sgn(m.net+un),cls(m.net+un)]);
   $('#strK').innerHTML=K.map(([n,v,c])=>`<div><span>${n}</span><b class="${c||''}">${v}</b></div>`).join('');
@@ -287,11 +403,18 @@ function rStr(){
   const show=S.show_weekday&&m.n>0;
   $('#sw').style.display=show?'':'none';
   if(show){const wd=[0,1,2,3,4,5,6].filter(i=>S.by_weekday[i].n), wv=wd.map(i=>S.by_weekday[i].net);
-    chart('s3','bar',wd.map(i=>D.weekday_labels[i]),[{data:wv,backgroundColor:signColors(wv)}]);}
+    chart('s3','bar',wd.map(i=>O.weekday_labels[i]),[{data:wv,backgroundColor:signColors(wv)}]);}
 }
 
-/* ---- チャート（値動き・通貨強弱。データはVPSの /public/、認証なし） ---- */
-//const PUBURL='https://x162-43-35-129.static.xvps.ne.jp/public/';
+/* ---- 描画の振り分け（表示中のタブだけ描く。非表示タブは幅0で壊れるため） ---- */
+function render(){
+  if(tab==='pos'){rSum();if(G)rG();if(O)rOPos();}
+  else if(tab==='chart'){if(csMode==='gmo')drawChart();else rChartO();}
+  else if(tab==='cmp'){rCmp();}
+  else if(tab==='str'){rStr();}
+}
+
+/* ---- OANDA チャート（値動き・通貨強弱。データはVPSの /public/、認証なし） ---- */
 const PUBURL='https://fx.camelliab1.com/public/';
 const ALL_SYMBOLS=["US100","JP225","US500","USDJPY","EURUSD","EURJPY","USDCHF","AUDCHF","GBPCHF","GBPUSD","AUDUSD","CHFJPY","EURGBP"];
 const DEF_SYMBOLS=["USDJPY","EURUSD","US100","JP225"], NSYM=4;
@@ -302,7 +425,6 @@ let SYMBOLS=loadSyms();
 const SHOW={H1:120,D1:100}, STALE_MIN=25, JST=9*3600;
 const CCOL={USD:"#2196F3",JPY:"#F44336",EUR:"#4CAF50",GBP:"#9C27B0",AUD:"#FF9800",CHF:"#795548"};
 const STR=[["short","Short (gen=0.98)"],["mid","Mid (gen=0.996)"],["long","Long (gen=0.999)"]];
-let tf='H1', cs={}, ss={}, PUB={}, built=false;
 const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e;};
 const fmt=t=>new Date((t+JST)*1000).toISOString().slice(5,16).replace('T',' ');
 const dayS=t=>new Date((t+JST)*1000).toISOString().slice(0,10);
@@ -317,26 +439,26 @@ function candle(p){
   return d;
 }
 function buildCandles(){
-  Object.values(cs).forEach(x=>x.lc.remove());cs={};
+  Object.values(csO).forEach(x=>x.lc.remove());csO={};
   $('#candles').replaceChildren();
   for(const s of SYMBOLS){
     const box=el('div','box'),ttl=el('div','ttl'),px=el('span'),div=el('div','lc');
     ttl.append(el('span',null,s+' '+tf),px);box.append(ttl,div);$('#candles').append(box);
     const lc=LightweightCharts.createChart(div,lcOpts(tf==='H1'));
-    cs[s]={lc,series:lc.addCandlestickSeries(),px};
+    csO[s]={lc,series:lc.addCandlestickSeries(),px};
   }
 }
 function drawCandles(){
   const d=PUB[tf];if(!d)return;
   for(const s of SYMBOLS){
-    const a=d.symbols[s];if(!cs[s]||!a||!a.length)continue;
+    const a=d.symbols[s];if(!csO[s]||!a||!a.length)continue;
     const pts=a.slice(-SHOW[tf]);
-    cs[s].series.setData(pts.map(candle));cs[s].lc.timeScale().fitContent();
-    cs[s].px.textContent=pts[pts.length-1].c;
+    csO[s].series.setData(pts.map(candle));csO[s].lc.timeScale().fitContent();
+    csO[s].px.textContent=pts[pts.length-1].c;
   }
 }
 function buildStrength(){
-  Object.values(ss).forEach(x=>x.lc.remove());ss={};
+  Object.values(ssO).forEach(x=>x.lc.remove());ssO={};
   const g=$('#strength');g.replaceChildren();
   for(const [k,label] of STR){
     const box=el('div','box'),lg=el('div','lg'),div=el('div','lc');
@@ -344,14 +466,14 @@ function buildStrength(){
     box.append(el('div','ttl',label),lg,div);g.append(box);
     const lc=LightweightCharts.createChart(div,lcOpts(true)),lines={};
     for(const c in CCOL)lines[c]=lc.addLineSeries({color:CCOL[c],lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
-    ss[k]={lc,lines};
+    ssO[k]={lc,lines};
   }
 }
 function drawStrength(js){
   for(const [k] of STR){
-    const s=js.series[k];if(!s||!ss[k])continue;
-    for(const c in CCOL)ss[k].lines[c].setData(s.points.map(p=>({time:p.t+JST,value:p[c]})));
-    ss[k].lc.timeScale().fitContent();
+    const s=js.series[k];if(!s||!ssO[k])continue;
+    for(const c in CCOL)ssO[k].lines[c].setData(s.points.map(p=>({time:p.t+JST,value:p[c]})));
+    ssO[k].lc.timeScale().fitContent();
   }
 }
 function drawStatus(st){
@@ -359,8 +481,8 @@ function drawStatus(st){
   bar.className=stale?'bad':'';
   bar.textContent=`最終更新 ${fmt(st.generated_at)} JST（${Math.round(age)}分前）`+(st.errors&&st.errors.length?` ／ 取得エラー ${st.errors.length}件`:'')+(stale?' ／ 更新が止まっている可能性があります':'');
 }
-function rChart(){
-  if(!built){buildCandles();buildStrength();built=true;}
+function rChartO(){
+  if(!oBuilt){buildCandles();buildStrength();oBuilt=true;}
   drawCandles();if(PUB.sg)drawStrength(PUB.sg);if(PUB.st)drawStatus(PUB.st);
 }
 async function loadPub(){
@@ -368,57 +490,164 @@ async function loadPub(){
   const ok=r=>r.status==='fulfilled'?r.value:null;
   if(st.status==='rejected'){$('#bar').className='bad';$('#bar').textContent='データを取得できません: '+st.reason.message;}
   PUB.st=ok(st);PUB.H1=ok(h1)||PUB.H1;PUB.D1=ok(d1)||PUB.D1;PUB.sg=ok(sg)||PUB.sg;PUB.po=ok(po);
-  if(tab==='chart'||tab==='pos')render();
+  if(tab==='chart'&&csMode==='oanda')rChartO();
+  if(tab==='pos'&&O)rOPos();
 }
-document.querySelectorAll('.tf button').forEach(b=>b.onclick=()=>{
+document.querySelectorAll('[data-tf]').forEach(b=>b.onclick=()=>{
   tf=b.dataset.tf;
-  document.querySelectorAll('.tf button').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('[data-tf]').forEach(x=>x.classList.toggle('on',x===b));
   buildCandles();drawCandles();
 });
 
-/* ---- 共通 ---- */
-function render(){
-  rAcct();
-  if(tab==='chart'){rChart();return;}
-  if(!D)return;
-  const t=new Date(D.generated_at);
-  $('#upd').textContent=t.toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})+' 更新';
-  $('#upd').className='m '+(Date.now()-t>30*60e3?'l':'');
-  ({pos:rPos,cmp:rCmp,str:rStr})[tab]();
+/* ---- GMO チャート（charts.json、自前 canvas 描画） ---- */
+const CHARTS_URL='https://fx.camelliab1.com/public/charts.json';
+let chType=LS.getItem('fx_chart_type')||'candle';
+const ohlc=r=>r.length>=5?{o:r[1],h:r[2],l:r[3],c:r[4]}:{o:r[1],h:r[1],l:r[1],c:r[1]}; // 旧形式 [date, close] にも対応
+function chSeries(){
+  if(!CH)return null;
+  if(chSel.kind==='fx'){
+    const d=(CH.fx||{})[chSel.key]; if(!d)return null;
+    // 表示期間は OANDA版チャートに合わせる（1時間足=120本、日足=100本）
+    if(chSel.tf==='intra')return {label:d.label,last:d.last,chg:d.chg_pct,pts:(d.intraday||[]).slice(-120).map(r=>{const t=new Date(r[0]);return {lab:(t.getMonth()+1)+'/'+t.getDate()+' '+String(t.getHours()).padStart(2,'0')+':00',...ohlc(r)};})};
+    return {label:d.label,last:d.last,chg:d.chg_pct,pts:(d.daily||[]).slice(-100).map(r=>({lab:String(r[0]).slice(5),...ohlc(r)}))};
+  }
+  const d=(CH.eq||{})[chSel.key]; if(!d)return null;
+  return {label:d.label,last:d.last,chg:d.chg_pct,pts:(d.daily||[]).slice(-100).map(r=>({lab:String(r[0]).slice(5),...ohlc(r)}))};
+}
+function drawChart(){
+  const cv=$('#cv'); if(!cv||!cv.getContext)return;
+  const s=chSeries();
+  const dpr=window.devicePixelRatio||1, W=cv.clientWidth, H=cv.clientHeight;
+  if(!W||!H)return;
+  cv.width=W*dpr; cv.height=H*dpr;
+  const x=cv.getContext('2d'); x.scale(dpr,dpr); x.clearRect(0,0,W,H);
+  if(!s||s.pts.length<2){$('#cName').textContent='データがありません';$('#cLast').textContent='';return;}
+  $('#cName').textContent=s.label;
+  $('#cLast').innerHTML=`<b class="big">${num(s.last, s.last&&Math.abs(s.last)<10?3:2)}</b> <span class="${cls(s.chg)}">${s.chg==null?'':(s.chg>0?'+':'')+s.chg+'%'}</span>`;
+  const pts=s.pts;
+  let mn=Math.min(...pts.map(p=>chType==='candle'?p.l:p.c)), mx=Math.max(...pts.map(p=>chType==='candle'?p.h:p.c));
+  const pad=(mx-mn)*0.08||1; mn-=pad; mx+=pad;
+  const L=6,R=6,T=16,B=18, iw=W-L-R, ih=H-T-B, n=pts.length;
+  const X=i=>L+iw*(n===1?0.5:i/(n-1)), Y=v=>T+ih*(1-(v-mn)/(mx-mn));
+  x.strokeStyle=css('--line'); x.fillStyle=css('--mute'); x.font='11px sans-serif'; x.lineWidth=1;
+  for(let i=0;i<=2;i++){const v=mn+(mx-mn)*i/2, y=Y(v); x.beginPath(); x.moveTo(L,y); x.lineTo(W-R,y); x.stroke(); x.fillText(num(v,Math.abs(v)<10?3:2),L,y-3);}
+  x.fillText(pts[0].lab,L,H-4);
+  const lastLab=pts[n-1].lab;
+  x.fillText(lastLab,W-R-x.measureText(lastLab).width,H-4);
+  if(chType==='candle'){
+    const bw=Math.max(1,Math.min(11,iw/n*0.62)), gcol=css('--gain'), lcol=css('--loss');
+    pts.forEach((p,i)=>{
+      const col=p.c>=p.o?gcol:lcol, cx=X(i);
+      x.strokeStyle=col; x.fillStyle=col; x.lineWidth=1;
+      x.beginPath(); x.moveTo(cx,Y(p.h)); x.lineTo(cx,Y(p.l)); x.stroke();
+      const y1=Y(Math.max(p.o,p.c)), y2=Y(Math.min(p.o,p.c));
+      x.fillRect(cx-bw/2, y1, bw, Math.max(1,y2-y1));
+    });
+  }else{
+    const vs=pts.map(p=>p.c), up=vs[n-1]>=vs[0];
+    x.strokeStyle=up?css('--gain'):css('--loss'); x.lineWidth=1.6; x.beginPath();
+    vs.forEach((v,i)=>{i?x.lineTo(X(i),Y(v)):x.moveTo(X(i),Y(v));});
+    x.stroke();
+    x.fillStyle=x.strokeStyle; x.beginPath(); x.arc(X(n-1),Y(vs[n-1]),2.6,0,7); x.fill();
+  }
+}
+function renderChips(){
+  const mk=(box,entries,kind)=>{box.innerHTML=entries.map(([k,v])=>
+    `<button class="chip ${chSel.kind===kind&&chSel.key===k?'on':''}" data-kind="${kind}" data-key="${k}">${v.label||k}</button>`).join('');};
+  if(!CH)return;
+  mk($('#chipsFx'),Object.entries(CH.fx||{}),'fx');
+  mk($('#chipsEq'),Object.entries(CH.eq||{}),'eq');
+  document.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{chSel.kind=b.dataset.kind;chSel.key=b.dataset.key;renderChips();drawChart();});
+  $('#tfI').className=chSel.tf==='intra'?'on':'';
+  $('#tfD').className=chSel.tf==='daily'?'on':'';
+  $('#tfI').style.display=chSel.kind==='fx'?'':'none';
+  $('#tfD').style.display=chSel.kind==='fx'?'':'none';
+  $('#ctC').className=chType==='candle'?'on':'';
+  $('#ctL').className=chType==='line'?'on':'';
+}
+$('#tfI').onclick=()=>{chSel.tf='intra';renderChips();drawChart();};
+$('#tfD').onclick=()=>{chSel.tf='daily';renderChips();drawChart();};
+$('#ctC').onclick=()=>{chType='candle';LS.setItem('fx_chart_type',chType);renderChips();drawChart();};
+$('#ctL').onclick=()=>{chType='line';LS.setItem('fx_chart_type',chType);renderChips();drawChart();};
+async function loadCharts(){
+  try{
+    const r=await fetch(CHARTS_URL,{cache:'no-store'});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    CH=await r.json();
+    updLine($('#updC'),CH.generated_at);
+    renderChips();
+    if(tab==='chart'&&csMode==='gmo')drawChart();
+  }catch(e){
+    $('#cName').textContent='チャートを取得できませんでした（'+e.message+'）';
+  }
+}
+window.addEventListener('resize',()=>{if(tab==='chart'&&csMode==='gmo')drawChart();});
+
+/* ---- チャートの2択切替（既定は GMO） ---- */
+function setCs(m){
+  csMode=m;
+  document.querySelectorAll('[data-cs]').forEach(b=>b.classList.toggle('on',b.dataset.cs===m));
+  $('#chartGmo').style.display=m==='gmo'?'':'none';
+  $('#chartOanda').style.display=m==='oanda'?'':'none';
+  if(tab==='chart'){if(m==='gmo')drawChart();else rChartO();}
+}
+document.querySelectorAll('[data-cs]').forEach(b=>b.onclick=()=>setCs(b.dataset.cs));
+
+/* ---- 口座データの取得（GMO と OANDA は独立。片方が失敗してももう片方は表示する） ---- */
+async function fetchOne(url,tok){
+  const r=await fetch(url,{headers:{Authorization:'Bearer '+tok},cache:'no-store'});
+  if(r.status===401)throw new Error('トークンが違います');
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  return r.json();
 }
 async function load(){
-  const url=LS.getItem('fx_url'), tok=LS.getItem('fx_tok')||'';
-  if(!url){openDlg();return;}
-  try{
-    const r=await fetch(url,{headers:{Authorization:'Bearer '+tok},cache:'no-store'});
-    if(r.status===401){msg('トークンが違います。設定を確認してください。');openDlg();return;}
-    if(!r.ok)throw new Error('HTTP '+r.status);
-    D=combine(await r.json());msg('');render();
-  }catch(e){msg('取得に失敗しました（'+e.message+'）。URLと通信状態を確認してください。');}
+  const c=cfg();
+  if(!c.tok){openDlg();return;}
+  const jobs=[
+    fetchOne(c.gUrl,c.tok).then(d=>{if(d.account&&d.account.margin_ratio>1e12)d.account.margin_ratio=null;G=d;})
+      .catch(e=>{$('#posG').innerHTML=`<p class="err">GMO の取得に失敗しました（${e.message}）</p>`;if(e.message.includes('トークン'))msg('トークンが違います。設定を確認してください。');}),
+    fetchOne(c.oUrl,c.tok).then(d=>{O=combine(d);})
+      .catch(e=>{$('#posO').innerHTML=`<p class="err">OANDA の取得に失敗しました（${e.message}）</p>`;if(e.message.includes('トークン'))msg('トークンが違います。設定を確認してください。');})
+  ];
+  await Promise.all(jobs);
+  render();
 }
-function openDlg(){$('#u').value=LS.getItem('fx_url')||'';$('#t').value=LS.getItem('fx_tok')||'';
+
+/* ---- 設定ダイアログ ---- */
+function openDlg(){
+  const c=cfg();
+  $('#ug').value=c.gUrl; $('#uo').value=c.oUrl; $('#t').value=LS.getItem('gmo_fx_tok')||LS.getItem('fx_tok')||'';
   $('#syms').replaceChildren(...SYMBOLS.map(s=>{const e=document.createElement('select');ALL_SYMBOLS.forEach(x=>e.add(new Option(x,x)));e.value=s;return e;}));
-  $('#dlg').showModal();}
+  $('#dlg').showModal();
+}
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
   tab=b.dataset.t;
   document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));
   document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.id===tab));
   render();});
 $('#sel').onchange=render;
-$('#rf').onclick=load;
+$('#rf').onclick=()=>{load();loadPub();loadCharts();};
 $('#st').onclick=openDlg;
 $('#no').onclick=()=>$('#dlg').close();
-$('#ok').onclick=()=>{LS.setItem('fx_url',$('#u').value.trim());LS.setItem('fx_tok',$('#t').value.trim());
+$('#ok').onclick=()=>{
+  const gu=$('#ug').value.trim()||DEF_G, ou=$('#uo').value.trim()||DEF_O, tk=$('#t').value.trim();
+  LS.setItem('gmo_fx_url',gu);
+  LS.setItem('fx_oanda_url',ou);
+  LS.setItem('fx_url',ou); // ルート版（旧ページ）のフォールバック用にも書く
+  LS.setItem('gmo_fx_tok',tk);
+  LS.setItem('fx_tok',tk);
   SYMBOLS=normSyms([...document.querySelectorAll('#syms select')].map(e=>e.value));
   LS.setItem('fx_syms',JSON.stringify(SYMBOLS));
-  if(built){buildCandles();drawCandles();}
-  $('#dlg').close();load();};
-document.addEventListener('visibilitychange',()=>{if(!document.hidden){load();loadPub();}});
+  if(oBuilt){buildCandles();drawCandles();}
+  $('#dlg').close();load();
+};
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){load();loadPub();loadCharts();}});
 setInterval(()=>{if(!document.hidden)load();},5*60e3);
+setInterval(()=>{if(!document.hidden)loadCharts();},5*60e3);
 setInterval(()=>{if(!document.hidden)loadPub();},2*60e3);
-matchMedia('(prefers-color-scheme:dark)').addEventListener('change',()=>{built=false;render();});
+matchMedia('(prefers-color-scheme:dark)').addEventListener('change',()=>{oBuilt=false;render();});
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');
-load();loadPub();
+load();loadPub();loadCharts();
 </script>
 </body>
 </html>
