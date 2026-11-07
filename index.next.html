@@ -72,7 +72,7 @@ dialog input{display:block;width:100%;margin-top:4px;padding:8px;font-size:16px;
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px}
 .chip{font-size:13px;padding:4px 10px;border-radius:999px}
 .chip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
-#cv{width:100%;height:220px;display:block;background:var(--sf);border:1px solid var(--line);border-radius:8px}
+#cv{width:100%;height:240px;display:block;background:var(--sf);border:1px solid var(--line);border-radius:8px}
 .chead{display:flex;justify-content:space-between;align-items:baseline;margin-top:12px}
 .chead .nm{font-size:18px;font-weight:700}
 </style>
@@ -507,11 +507,12 @@ function chSeries(){
   if(!CH)return null;
   if(chSel.kind==='fx'){
     const d=(CH.fx||{})[chSel.key]; if(!d)return null;
-    if(chSel.tf==='intra')return {label:d.label,last:d.last,chg:d.chg_pct,pts:(d.intraday||[]).map(r=>{const t=new Date(r[0]);return {lab:(t.getMonth()+1)+'/'+t.getDate()+' '+String(t.getHours()).padStart(2,'0')+':00',...ohlc(r)};})};
-    return {label:d.label,last:d.last,chg:d.chg_pct,pts:(d.daily||[]).map(r=>({lab:String(r[0]).slice(5),...ohlc(r)}))};
+    // 表示期間は OANDA版チャートに合わせる（1時間足=120本、日足=100本）
+    if(chSel.tf==='intra')return {label:d.label,last:d.last,chg:d.chg_pct,pts:(d.intraday||[]).slice(-120).map(r=>{const t=new Date(r[0]);return {lab:(t.getMonth()+1)+'/'+t.getDate()+' '+String(t.getHours()).padStart(2,'0')+':00',...ohlc(r)};})};
+    return {label:d.label,last:d.last,chg:d.chg_pct,pts:(d.daily||[]).slice(-100).map(r=>({lab:String(r[0]).slice(5),...ohlc(r)}))};
   }
   const d=(CH.eq||{})[chSel.key]; if(!d)return null;
-  return {label:d.label,last:d.last,chg:d.chg_pct,pts:(d.daily||[]).map(r=>({lab:String(r[0]).slice(5),...ohlc(r)}))};
+  return {label:d.label,last:d.last,chg:d.chg_pct,pts:(d.daily||[]).slice(-100).map(r=>({lab:String(r[0]).slice(5),...ohlc(r)}))};
 }
 function drawChart(){
   const cv=$('#cv'); if(!cv||!cv.getContext)return;
