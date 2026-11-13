@@ -638,6 +638,72 @@
       @media (prefers-reduced-motion: reduce) {
         .progress-track span,.sea-control .actions button,.big-start { transition:none; }
       }
+
+      /* ---------- viewport-fit layout ---------- */
+      html, body { min-height: 100%; }
+      body { overflow-x: hidden; }
+      .wrap { max-width: 1440px; padding: 7px 12px 8px; }
+      .adventure-hero { padding: 7px 16px; margin-bottom: 6px; border-radius: 15px; }
+      .hero-mark { font-size: 2rem; }
+      .hero-copy h1 { font-size: clamp(1.15rem, 2.4vw, 1.65rem); }
+      .hero-copy p { font-size: .72rem; }
+      .hero-mascot { font-size: 1.8rem; }
+      .explore-progress {
+        display: flex; align-items: center; gap: 12px;
+        padding: 5px 10px; margin-bottom: 6px; border-radius: 10px;
+      }
+      .progress-label { flex: none; font-size: .72rem; }
+      .progress-track { flex: 1; height: 7px; margin: 0; }
+      .dest-banner { padding: 5px 10px; margin-bottom: 6px; font-size: .82rem; }
+      .dest-banner b { font-size: .95rem; }
+      .map-panel { padding: 7px 10px; margin-bottom: 5px; }
+      .map-head { margin: 0 0 3px; }
+      .map-stage {
+        width: min(100%, 820px, calc(100dvh - 330px));
+        aspect-ratio: 1 / 1;
+      }
+      .map-stage .japan-map { width: 100%; height: 100%; aspect-ratio: auto; }
+      .map-legend { margin: 2px 0; font-size: .64rem; line-height: 1.25; }
+      .player-colors { margin: 2px 0; gap: 4px; }
+      .pcolor-chip { padding: 2px 7px; font-size: .68rem; }
+      .map-info { margin-top: 2px; padding: 3px 7px; font-size: .72rem; line-height: 1.3; }
+      .props-panel { padding: 5px 10px; margin: 4px 0 0; }
+      .props-panel summary { cursor: pointer; font-size: .78rem; font-weight: 800; color: var(--ink-soft); }
+      .props-panel[open] { max-height: 20vh; overflow: auto; }
+      @media (max-width: 640px) {
+        .wrap { padding: 5px 6px 6px; }
+        .adventure-hero { padding: 6px 9px; margin-bottom: 5px; }
+        .hero-mark { font-size: 1.65rem; }
+        .hero-mascot { font-size: 1.45rem; }
+        .hero-kicker { font-size: .52rem; }
+        .hero-copy h1 { font-size: 1.15rem; }
+        .hero-copy p { font-size: .62rem; }
+        .explore-progress { padding: 4px 7px; gap: 7px; margin-bottom: 5px; }
+        .progress-label { font-size: .65rem; }
+        .dest-banner { gap: 2px 8px; padding: 4px 7px; margin-bottom: 5px; font-size: .72rem; }
+        .dest-banner b { font-size: .84rem; }
+        .map-panel { padding: 5px; }
+        .map-head .map-title { font-size: .78rem; }
+        .map-zoom { min-height: 1.7rem; font-size: .68rem; }
+        .map-stage { width: min(100%, calc(100svh - 285px)); }
+        .map-legend { font-size: .58rem; }
+        .map-info { font-size: .64rem; }
+      }
+      @media (max-height: 700px) and (min-width: 641px) {
+        .map-stage { width: min(100%, 820px, calc(100dvh - 285px)); }
+        .adventure-hero { padding: 4px 12px; }
+        .explore-progress { padding: 3px 9px; }
+        .dest-banner { padding: 3px 8px; }
+        .map-legend { display: none; }
+        .sea-players { left: 6px; right: 6px; width: auto; padding: 5px; }
+        .sea-players .sea-window-title { display: none; }
+        .sea-players .status { flex-direction: row; gap: 4px; }
+        .sea-players .pcard { flex: 1 1 0; min-width: 0; padding: 4px 5px; }
+        .sea-players .pcard .pname { font-size: .66rem; }
+        .sea-players .pcard .pmoney { font-size: .74rem; }
+        .sea-players .pcard .psub { display: none; }
+        .sea-control { width: min(310px, 72%); }
+      }
     </style>
   </head>
   <body>
@@ -691,10 +757,10 @@
         <div class="map-info" id="mapInfo"></div>
       </section>
 
-      <section class="panel">
-        <h3>あなたの物件</h3>
+      <details class="panel props-panel">
+        <summary>あなたの物件を見る</summary>
         <ul class="myprops" id="myProps"></ul>
-      </section>
+      </details>
     </div>
 
     <!-- start overlay -->
