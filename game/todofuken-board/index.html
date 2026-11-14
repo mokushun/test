@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="color-scheme" content="light dark" />
+    <meta name="color-scheme" content="light" />
     <link rel="icon" href="data:," />
     <title>都道府県ボードゲーム</title>
     <style>
@@ -29,29 +29,7 @@
         --shadow: 0 2px 10px rgba(34, 48, 31, 0.12);
         --radius: 14px;
       }
-      @media (prefers-color-scheme: dark) {
-        :root {
-          --bg: #141a13;
-          --panel: #1e271d;
-          --panel-2: #232e22;
-          --ink: #e6eedd;
-          --ink-soft: #a7b8a1;
-          --line: #39462f;
-          --accent: #4caf6d;
-          --accent-ink: #0e1a10;
-          --gold: #e0aa3e;
-          --danger: #e5735f;
-          --tile-bg: #27331f;
-          --tile-ink: #eef3e4;
-          --center-bg: #202a1e;
-          --sea: #1d3040;
-          --sea-ink: #5f7f95;
-          --land: #38543a;
-          --land-line: #6b9463;
-          --map-chip: #2b3a2c;
-          --shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
-        }
-      }
+      
       * { box-sizing: border-box; }
       html, body { margin: 0; padding: 0; }
       body {
@@ -346,7 +324,7 @@
         font-size: clamp(8px, 2.2vw, 11px); font-weight: 800; pointer-events: none; line-height: 1.1; text-align: center;
       }
       .okinawa-inset {
-        position: absolute; left: 1%; bottom: 1%; width: 12%; height: 15%; z-index: 1;
+        position: absolute; left: 1%; bottom: 1%; width: 9.5%; height: 15%; z-index: 1;
         border: 1.5px dashed var(--sea-ink); border-radius: 6px;
         background: color-mix(in srgb, var(--sea) 55%, transparent);
       }
@@ -752,6 +730,7 @@
 .tc-fact { font-size:11.5px; padding:4px 10px; line-height:1.5; flex:1; overflow:auto; }
 .tc-foot { text-align:center; font-size:11px; color:#8a6d2f; padding:5px; border-top:1px dashed #d8c690; }
 .tc-q { font-weight:800; font-size:13.5px; padding:10px 10px 2px; line-height:1.5; }
+.tcard-back .cq-exp { flex:1; min-height:0; overflow-y:auto; }
 .tc-choices { padding:2px 10px; display:flex; flex-direction:column; align-items:flex-start; }
 .tc-choices .cq-btn { margin-top:5px; }
 .card-sheet { max-width:300px; margin:0 auto; }
@@ -792,6 +771,8 @@
 #japanMap.choosing .map-pin.choice-target { opacity:1; padding:16px; }
 .map-pin.choice-picked { animation:pickedFlash .8s ease; }
 @keyframes pickedFlash { 0%{ filter:brightness(1);} 30%{ filter:brightness(1.9) drop-shadow(0 0 12px #ffd23f);} 100%{ filter:brightness(1);} }
+
+.winner-note { text-align:center; font-size:clamp(17px,4.6vw,22px); font-weight:900; margin:4px 0 10px; }
 </style>
   </head>
   <body>
@@ -866,17 +847,6 @@
     </div>
 
     <!-- quiz overlay -->
-    <div class="overlay" id="quizOverlay" hidden>
-      <div class="sheet">
-        <div class="csub" id="quizKicker">地理クイズ</div>
-        <div class="quiz-q" id="quizQ"></div>
-        <div class="quiz-choices" id="quizChoices"></div>
-        <div class="quiz-feedback" id="quizFeedback"></div>
-        <div class="actions" style="margin-top:14px;">
-          <button type="button" class="primary" id="quizOk" hidden>わかった！</button>
-        </div>
-      </div>
-    </div>
 
     <!-- dice overlay (center) -->
     <div class="overlay dice-overlay" id="diceOverlay" hidden>
@@ -981,10 +951,9 @@ const PREFS = [
   { name: "大分県", short: "大分", capital: "大分市", region: "kyushu", specialty: "温泉", property: "温泉旅館", price: 420, fact: "温泉の湧出量・源泉数が日本一。別府・由布院が有名です。" },
   { name: "宮崎県", short: "宮崎", capital: "宮崎市", region: "kyushu", specialty: "マンゴー", property: "マンゴー園", price: 350, fact: "完熟マンゴー「太陽のたまご」が名産です。" },
   { name: "鹿児島県", short: "鹿児島", capital: "鹿児島市", region: "kyushu", specialty: "黒豚", property: "黒豚料理店", price: 400, fact: "桜島を望む県。西郷隆盛の出身地です。" },
-  { name: "沖縄県", short: "沖縄", capital: "那覇市", region: "kyushu", specialty: "海ぶどう", property: "海ぶどう養殖場", price: 600, fact: "日本で最も南・西にある県。美しい海で知られます。" }
+  { name: "沖縄県", short: "沖縄", capital: "那覇市", region: "kyushu", specialty: "海ぶどう", property: "海ぶどう養殖場", price: 600, fact: "県の中では最も南・西にある県。美しい海で知られます。" }
 ];
 /* board index: 0 = start, 1..47 = PREFS[0..46] */
-const BOARD_LEN = 48;
 /* capital-city positions on the centre map: % coordinates projected from
    each capital's real latitude/longitude with the same projection as the
    prefecture polygons below (main-islands frame; Okinawa sits inside the
@@ -1058,7 +1027,7 @@ const ROAD_EDGES=[
 ];
 const ROAD_GRAPH=PREFS.map(()=>[]);
 ROAD_EDGES.forEach(([a,b,type,label])=>{const e={type:type||"road",label:label||"道路"};ROAD_GRAPH[a].push({to:b,edge:e});ROAD_GRAPH[b].push({to:a,edge:e});});
-function roadPoint(i){return i===46?{x:15.7,y:86.3}:MAP_POS[i];}
+function roadPoint(i){return i===46?{x:1+MAP_POS[46].x*0.095,y:84+MAP_POS[46].y*0.15}:MAP_POS[i];}
 function roadEdgePoints(a,b){return [roadPoint(a),roadPoint(b)];}
 function drawRoads(container){
  const ns="http://www.w3.org/2000/svg",svg=document.createElementNS(ns,"svg");
@@ -1068,8 +1037,6 @@ function drawRoads(container){
  l.setAttribute("class",type==="ferry"?"road ferry":type==="bridge"?"road bridge":"road");svg.appendChild(l);});
  container.appendChild(svg);
 }
-const LEVEL_NAMES = ["", "屋台", "店舗", "工場"];
-const LEVEL_MULT = [0, 1, 1.6, 2.4];
 /* dice pips drawn with CSS dots (no reliance on dice glyph fonts) */
 const PIP_MAP = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
 function renderDice(n) {
@@ -1084,13 +1051,6 @@ function renderDice(n) {
   }
 }
 
-const EVENTS = [
-  { text: "観光客がたくさん訪れた！ 臨時収入 +150万円", cash: 150 },
-  { text: "テレビで紹介されて話題に！ 臨時収入 +200万円", cash: 200 },
-  { text: "出張が重なって経費がかさんだ… -100万円", cash: -100 },
-  { text: "地域のお祭りが大盛況！ 臨時収入 +120万円", cash: 120 },
-  { text: "車両の修理費がかかった… -80万円", cash: -80 }
-];
 
 /* ================= state ================= */
 let S = null;
@@ -1104,7 +1064,7 @@ function newState(){
  for(let i=players.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[players[i],players[j]]=[players[j],players[i]];}
  const owners={};
  players.forEach((pl,pi)=>{owners[pl.startPref]=pi;pl.visited[pl.startPref]=true;pl.cards=1;});
- return {current:0,turn:1,players,owners,learned:Object.fromEntries(starts.map(i=>[i,true])),over:false};
+ return {current:0,turn:1,players,owners,over:false};
 }
 
 /* ================= helpers ================= */
@@ -1117,43 +1077,8 @@ if (typeof window !== "undefined" && Array.isArray(window.PREFECTURE_CARD_DATA))
 function cardOf(i) { return CARD_BY_NAME[PREFS[i].name] || null; }
 function humanIndex() { return S.players.findIndex((pl) => !pl.cpu); }
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-function fmt(n) { return (n < 0 ? "−" : "") + Math.abs(Math.round(n)).toLocaleString("ja-JP"); }
-function prefOf(boardIdx) { return PREFS[boardIdx - 1]; }
-function fwdDist(from, to) { return (to - from + BOARD_LEN) % BOARD_LEN; }
 function dateLabel() {
-  const r = S.round;
-  return Math.ceil(r / 12) + "年目" + (((r - 1) % 12) + 1) + "月";
-}
-function ownsRegion(p, region) {
-  for (let i = 1; i < BOARD_LEN; i++) {
-    if (prefOf(i).region === region) {
-      const o = S.owners[i];
-      if (!o || o.player !== p) return false;
-    }
-  }
-  return true;
-}
-function regionCount(region) {
-  let n = 0;
-  for (let i = 1; i < BOARD_LEN; i++) if (prefOf(i).region === region) n++;
-  return n;
-}
-function propValue(boardIdx) {
-  const o = S.owners[boardIdx];
-  if (!o) return 0;
-  return Math.round(prefOf(boardIdx).price * LEVEL_MULT[o.level]);
-}
-function rentOf(boardIdx) {
-  const o = S.owners[boardIdx];
-  if (!o) return 0;
-  let v = propValue(boardIdx) * 0.08;
-  if (ownsRegion(o.player, prefOf(boardIdx).region)) v *= 2;
-  return Math.round(v);
-}
-function totalAssets(p) {
-  let a = S.players[p].cash;
-  for (const k in S.owners) if (S.owners[k].player === p) a += propValue(+k);
-  return a;
+  return "第" + (S.turn || 1) + "ターン";
 }
 function setMsg(t) { $("msg").textContent = t; }
 function log(text) {
@@ -1167,88 +1092,13 @@ function log(text) {
   ul.prepend(li);
   while (ul.children.length > 40) ul.removeChild(ul.lastChild);
 }
-function learn(prefIdx) {
-  if (!S.learned[prefIdx]) S.learned[prefIdx] = true;
-  renderMaps();
-}
-
 /* ================= board rendering ================= */
-function tilePos(i) {
-  /* 13x13 perimeter, clockwise from top-left */
-  if (i <= 12) return { row: 1, col: i + 1 };
-  if (i <= 24) return { row: i - 11, col: 13 };
-  if (i <= 36) return { row: 13, col: 37 - i };
-  return { row: 49 - i, col: 1 };
-}
-const tileEls = [];
-function buildBoard() {
-  const board = $("board");
-  if (!board) return;
-  for (let i = 0; i < BOARD_LEN; i++) {
-    const d = document.createElement("div");
-    const pos = tilePos(i);
-    d.style.gridRow = pos.row;
-    d.style.gridColumn = pos.col;
-    if (i === 0) {
-      d.className = "tile start-tile";
-      d.innerHTML = '<div class="tname">スタート</div><div class="tprice">一周で決算</div><div class="tokens"></div>';
-    } else {
-      const p = prefOf(i);
-      d.className = "tile";
-      d.innerHTML =
-        '<div class="band" style="background:' + REGIONS[p.region].color + '"></div>' +
-        '<div class="tname">' + p.short + "</div>" +
-        '<div class="tprice">' + p.price + "万</div>" +
-        '<div class="tstars"></div>' +
-        '<div class="tokens"></div>';
-    }
-    board.appendChild(d);
-    tileEls.push(d);
-  }
-}
+let lastHopPi = -1, lastHopT = 0;
 function renderTokens(hopPlayer) {
-  if (!tileEls.length) {
-    renderMaps();
-    if (hopPlayer >= 0) {
-      document.querySelectorAll('.pip-player[data-player="' + hopPlayer + '"]').forEach((el) => el.classList.add("hop"));
-    }
-    return;
-  }
-  for (let i = 0; i < BOARD_LEN; i++) {
-    const box = tileEls[i].querySelector(".tokens");
-    box.innerHTML = "";
-    S.players.forEach((pl, pi) => {
-      // PREFS は0始まり、旧ボードの北海道タイルは1番目。
-      if (pl.pos + 1 === i) {
-        const t = document.createElement("div");
-        t.className = "token" + (pi === hopPlayer ? " hop" : "");
-        t.style.background = pl.color;
-        t.textContent = pl.initial;
-        box.appendChild(t);
-      }
-    });
-  }
-}
-function renderTiles() {
-  if (!tileEls.length) return;
-  for (let tileIndex = 1; tileIndex < BOARD_LEN; tileIndex++) {
-    const el = tileEls[tileIndex];
-    const prefIndex = tileIndex - 1;
-    const owner = S.owners[prefIndex];
-    const priceEl = el.querySelector(".tprice");
-    const starEl = el.querySelector(".tstars");
-    el.classList.remove("dest");
-    if (owner !== undefined) {
-      priceEl.textContent = S.players[owner].name + "の所有";
-      priceEl.style.color = S.players[owner].color;
-      priceEl.style.fontWeight = "800";
-      starEl.textContent = "★";
-    } else {
-      priceEl.textContent = PREFS[prefIndex].specialty;
-      priceEl.style.color = "";
-      priceEl.style.fontWeight = "";
-      starEl.textContent = "";
-    }
+  if (hopPlayer >= 0) { lastHopPi = hopPlayer; lastHopT = Date.now(); }
+  renderMaps();
+  if (hopPlayer >= 0) {
+    document.querySelectorAll('.pip-player[data-player="' + hopPlayer + '"]').forEach((el) => el.classList.add("hop"));
   }
 }
 function ownedCount(pi){return Object.values(S.owners).filter(owner=>owner===pi).length;}
@@ -1263,6 +1113,7 @@ function renderStatus(){
  const n=Object.keys(S.owners).length;$("exploreCount").textContent=n+" / 47 県";$("exploreBar").style.width=(n/47*100)+"%";
 }
 
+const cardUiState = { flipped: new Set(), answered: new Map() };
 function buildTradingCard(k){
  const p=PREFS[k],cd=cardOf(k),rg=REGIONS[p.region],no="No."+String(k+1).padStart(2,"0");
  const root=document.createElement("li");root.className="tcard";
@@ -1280,20 +1131,22 @@ function buildTradingCard(k){
  const bQ=document.createElement("div");bQ.className="tc-q";bQ.textContent=cd.question;
  const bChoices=document.createElement("div");bChoices.className="tc-choices";
  const bExp=document.createElement("div");bExp.className="cq-exp";bExp.style.padding="4px 10px";
+ const applyAnswer=(chosen)=>{
+  bChoices.querySelectorAll("button").forEach(x=>{x.disabled=true;if(x.textContent===cd.answer)x.classList.add("correct");else if(x.textContent===chosen)x.classList.add("wrong");});
+  bExp.textContent=(chosen===cd.answer?"正解！ ":"ざんねん、正解は「"+cd.answer+"」。 ")+cd.explanation;
+ };
  cd.choices.forEach(ch=>{
   const b=document.createElement("button");b.type="button";b.className="cq-btn";b.textContent=ch;
-  b.addEventListener("click",(ev)=>{
-   ev.stopPropagation();
-   bChoices.querySelectorAll("button").forEach(x=>{x.disabled=true;if(x.textContent===cd.answer)x.classList.add("correct");else if(x===b)x.classList.add("wrong");});
-   bExp.textContent=(ch===cd.answer?"正解！ ":"ざんねん、正解は「"+cd.answer+"」。 ")+cd.explanation;
-  });
+  b.addEventListener("click",(ev)=>{ev.stopPropagation();cardUiState.answered.set(k,ch);applyAnswer(ch);});
   bChoices.appendChild(b);
  });
+ if(cardUiState.answered.has(k))applyAnswer(cardUiState.answered.get(k));
  const bFoot=document.createElement("div");bFoot.className="tc-foot";bFoot.textContent="タップで おもて面へ";
  back.appendChild(bHead);back.appendChild(bQ);back.appendChild(bChoices);back.appendChild(bExp);back.appendChild(bFoot);
  inner.appendChild(front);inner.appendChild(back);
  root.appendChild(inner);
- root.addEventListener("click",()=>{root.classList.toggle("flipped");});
+ if(cardUiState.flipped.has(k))root.classList.add("flipped");
+ root.addEventListener("click",()=>{root.classList.toggle("flipped");if(root.classList.contains("flipped"))cardUiState.flipped.add(k);else cardUiState.flipped.delete(k);});
  return root;
 }
 function showSplash(title,sub,kind,ms){
@@ -1325,7 +1178,6 @@ function showCardPopup(k,title){
   let done=false;
   const finish=()=>{if(done)return;done=true;$("cardOverlay").hidden=true;res();};
   $("cardPopBtn").onclick=finish;
-  setTimeout(finish,4500);
  });
 }
 function renderMyProps(){
@@ -1360,7 +1212,7 @@ function renderPlayerColors() {
   note.textContent = "県の色は所有者。到着した県だけ獲得・対決します";
   box.appendChild(note);
 }
-function renderAll() { renderStatus(); renderTiles(); renderTokens(-1); renderMyProps(); renderPlayerColors(); renderMaps(); }
+function renderAll() { renderStatus(); renderTokens(-1); renderMyProps(); renderPlayerColors(); renderMaps(); }
 
 /* ================= japan map (board centre) ================= */
 let selectedPref = -1;
@@ -1433,10 +1285,10 @@ function buildJapanMap(container,infoEl){
  const dec=document.createElement("div");dec.innerHTML='<span class="sea-label japansea">日本海</span><span class="sea-label pacific">太平洋</span><span class="north-arrow">▲<br>北</span>';while(dec.firstChild)container.appendChild(dec.firstChild);
  const inset=document.createElement("div");inset.className="okinawa-inset";inset.innerHTML=OKINAWA_SVG+'<span class="inset-label">沖縄</span>';container.appendChild(inset);
  inst.prefPaths=Array.from(container.querySelectorAll(".pref-shape"));drawRoads(container);
- PREFS.forEach((p,i)=>{if(i===46)return;const path=inst.prefPaths[i];if(!path)return;const box=path.getBBox();const label=document.createElement("span");label.className="pref-name-label";label.textContent=p.short;label.style.left=(box.x+box.width/2)+"%";label.style.top=(box.y+box.height/2)+"%";container.appendChild(label);inst.prefLabels.push(label);});
+ PREFS.forEach((p,i)=>{if(i===46)return;const path=inst.prefPaths[i];if(!path)return;const label=document.createElement("span");label.className="pref-name-label";label.textContent=p.short;label.style.left=MAP_POS[i].x+"%";label.style.top=(MAP_POS[i].y+2.6)+"%";container.appendChild(label);inst.prefLabels.push(label);});
  PREFS.forEach((p,i)=>{const pos=MAP_POS[i],b=document.createElement("button");b.type="button";b.className="map-pin"+(pos.flip?" flip":"");b.style.setProperty("--rc",REGIONS[p.region].color);
  b.setAttribute("aria-label",p.name+"（県庁所在地："+p.capital+"）");b.innerHTML='<span class="cap-star">★</span><span class="cap-lab">'+p.short+'<span class="cap-name">'+p.capital+'</span></span><span class="pips"></span>';
- b.style.left=pos.x+"%";b.style.top=pos.y+"%";(pos.inset?inset:container).appendChild(b);b.addEventListener("pointerdown",()=>handlePinClick(i));b.addEventListener("click",()=>handlePinClick(i));inst.pins.push(b);});
+ b.style.left=pos.x+"%";b.style.top=pos.y+"%";(pos.inset?inset:container).appendChild(b);b.addEventListener("pointerdown",(e)=>{pinPress={i:i,x:e.clientX,y:e.clientY};});b.addEventListener("pointerup",(e)=>{if(pinPress&&pinPress.i===i&&Math.hypot(e.clientX-pinPress.x,e.clientY-pinPress.y)<12){pinPress=null;lastPinTap={i:i,t:Date.now()};handlePinClick(i);}});b.addEventListener("pointercancel",()=>{pinPress=null;});b.addEventListener("click",()=>{if(lastPinTap.i===i&&Date.now()-lastPinTap.t<700)return;handlePinClick(i);});inst.pins.push(b);});
  inst.infoEl=infoEl;mapInstances.push(inst);return inst;
 }
 
@@ -1455,7 +1307,7 @@ function renderMaps(){
  if(!S)return;mapInstances.forEach(inst=>{
   inst.pins.forEach((pin,i)=>{
    const pips=pin.querySelector(".pips");pips.innerHTML="";
-   S.players.forEach((pl,pi)=>{if(pl.pos===i){const d=document.createElement("span");d.className="pip-player";d.setAttribute("data-player",pi);d.style.background=pl.color;d.textContent=pl.initial;pips.appendChild(d);}});
+   S.players.forEach((pl,pi)=>{if(pl.pos===i){const d=document.createElement("span");d.className="pip-player"+(pi===lastHopPi&&Date.now()-lastHopT<650?" hop":"");d.setAttribute("data-player",pi);d.style.background=pl.color;d.textContent=pl.initial;pips.appendChild(d);}});
    const owner=S.owners[i],owned=owner!==undefined;
    pin.classList.toggle("owned",owned);
    pin.style.setProperty("--pc",owned?S.players[owner].color:"var(--rc)");
@@ -1467,63 +1319,6 @@ function renderMaps(){
 }
 
 /* ================= quiz ================= */
-function pickDistractors(prefIdx, field, n) {
-  const self = PREFS[prefIdx];
-  const pool = PREFS.map((p, i) => i).filter((i) => i !== prefIdx && PREFS[i][field] !== self[field]);
-  pool.sort((a, b) => {
-    const ra = PREFS[a].region === self.region ? 0 : 1;
-    const rb = PREFS[b].region === self.region ? 0 : 1;
-    return ra - rb || Math.random() - 0.5;
-  });
-  const picked = [];
-  const used = new Set([self[field]]);
-  for (const i of pool) {
-    if (picked.length >= n) break;
-    if (!used.has(PREFS[i][field])) { used.add(PREFS[i][field]); picked.push(PREFS[i][field]); }
-  }
-  return picked;
-}
-function askQuiz(prefIdx, kind) {
-  /* kind: "capital" | "specialty" -> Promise<boolean> */
-  return new Promise((resolve) => {
-    const p = PREFS[prefIdx];
-    const field = kind === "capital" ? "capital" : "specialty";
-    const answer = p[field];
-    const choices = pickDistractors(prefIdx, field, 2).concat([answer]);
-    choices.sort(() => Math.random() - 0.5);
-    $("quizKicker").textContent = kind === "capital" ? "地理クイズ：県庁所在地" : "地理クイズ：特産品";
-    $("quizQ").textContent = kind === "capital"
-      ? p.name + "の県庁所在地（都庁所在地）はどこでしょう？"
-      : p.name + "の特産品はどれでしょう？";
-    $("quizFeedback").textContent = "";
-    $("quizOk").hidden = true;
-    const box = $("quizChoices");
-    box.innerHTML = "";
-    choices.forEach((c) => {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.textContent = c;
-      b.addEventListener("click", () => {
-        const ok = c === answer;
-        box.querySelectorAll("button").forEach((x) => {
-          x.disabled = true;
-          if (x.textContent === answer) x.classList.add("correct");
-          else if (x === b) x.classList.add("wrong");
-        });
-        $("quizFeedback").innerHTML = ok
-          ? "<b>正解！</b> " + p.name + "の" + (kind === "capital" ? "県庁所在地は" : "特産品は") + "「" + answer + "」です。" + p.fact
-          : "<b>ざんねん…</b> 正解は「" + answer + "」です。" + p.fact;
-        learn(prefIdx);
-        const okBtn = $("quizOk");
-        okBtn.hidden = false;
-        okBtn.onclick = () => { $("quizOverlay").hidden = true; resolve(ok); };
-      });
-      box.appendChild(b);
-    });
-    $("quizOverlay").hidden = false;
-  });
-}
-
 /* ================= game flow ================= */
 function setActions(buttons) {
   const box = $("actions");
@@ -1545,20 +1340,10 @@ function showWait(text) {
   d.textContent = text;
   box.appendChild(d);
 }
-function chooseDestination(fromPos) {
-  let best = -1, bestDist = -1;
-  for (let tries = 0; tries < 30; tries++) {
-    const cand = 1 + Math.floor(Math.random() * 47);
-    const d = fwdDist(fromPos, cand);
-    if (d >= 10 && d <= 40) { best = cand; bestDist = d; break; }
-    if (d > bestDist) { best = cand; bestDist = d; }
-  }
-  S.dest = best;
-  S.destBonus = 350 + bestDist * 15;
-}
-
 /* ===== map centering & on-map fork choice (2026-11-14) ===== */
 let mapChoice = null;
+let pinPress = null;
+let lastPinTap = { i: -1, t: 0 };
 function centerMapOn(prefIdx,smooth){
  try{
   const inst=mapInstances[0];if(!inst||!inst.pins[prefIdx])return;
@@ -1595,11 +1380,6 @@ function waitForkChoice(choices){
   markChoicePins(choices);
   setActions(choices.map((o,i)=>({label:PREFS[o.to].name+(o.edge.type==="road"?"":"（"+o.edge.label+"）"),onClick:()=>finish(i)})));
  });
-}
-function humanChoice(buttons) {
-  return new Promise((resolve) => {
-    setActions(buttons.map((b, i) => ({ label: b.label, cls: b.cls, onClick: () => resolve(i) })));
-  });
 }
 /* the dice itself is the roll button: it lights up on the human turn and
    the turn waits until it is tapped */
@@ -1661,167 +1441,6 @@ async function movePlayer(pi,steps){
  }
  pl.visited[pl.pos]=true;
  return pl.pos;
-}
-
-async function settlement(pi) {
-  const pl = S.players[pi];
-  let income = 0;
-  for (const k in S.owners) {
-    if (S.owners[k].player === pi) {
-      let v = propValue(+k) * 0.12;
-      if (ownsRegion(pi, prefOf(+k).region)) v *= 2;
-      income += Math.round(v);
-    }
-  }
-  if (income > 0) {
-    pl.cash += income;
-    log(pl.name + " は一周して決算。物件収益 +" + fmt(income) + "万円");
-    setMsg(pl.name + " は一周しました。決算で物件収益 " + fmt(income) + "万円が入りました。");
-  } else {
-    log(pl.name + " は一周（物件なしで収益なし）");
-    setMsg(pl.name + " は一周しました。（物件がないので収益なし）");
-  }
-  const ev = EVENTS[Math.floor(Math.random() * EVENTS.length)];
-  pl.cash += ev.cash;
-  log("イベント：" + ev.text + "（" + pl.name + "）");
-  renderStatus();
-  if (!pl.cpu) {
-    setMsg("決算収益 " + fmt(income) + "万円。イベント：" + ev.text);
-    await wait(600);
-  }
-}
-
-async function arriveDestination(pi) {
-  const pl = S.players[pi];
-  const dp = prefOf(S.dest);
-  pl.cash += S.destBonus;
-  log(pl.name + " が目的地 " + dp.name + " に到着！ ボーナス +" + fmt(S.destBonus) + "万円");
-  learn(S.dest - 1);
-  renderStatus();
-  if (!pl.cpu) {
-    setMsg("目的地 " + dp.name + " に到着！ ボーナス " + fmt(S.destBonus) + "万円。特産品クイズに正解するとさらに +150万円！");
-    const ok = await askQuiz(S.dest - 1, "specialty");
-    if (ok) {
-      pl.cash += 150;
-      log("あなた は特産品クイズに正解！ +150万円");
-      setMsg("クイズ正解！ さらに +150万円もらいました。");
-    } else {
-      setMsg("クイズは残念…でも " + dp.name + " の特産品は「" + dp.specialty + "」。覚えておこう。");
-    }
-    renderStatus();
-    await wait(400);
-  } else {
-    setMsg(pl.name + " が目的地 " + dp.name + " に到着し、ボーナス " + fmt(S.destBonus) + "万円を獲得。");
-    await wait(650);
-  }
-  chooseDestination(pl.pos);
-  renderAll();
-  log("次の目的地は " + prefOf(S.dest).name + "（" + prefOf(S.dest).capital + "）");
-  setMsg("次の目的地は " + prefOf(S.dest).name + "（" + prefOf(S.dest).capital + "）です。");
-  if (!pl.cpu) await wait(500);
-}
-
-async function resolveTile(pi) {
-  const pl = S.players[pi];
-  const idx = pl.pos;
-  if (idx === 0) return;
-  const p = prefOf(idx);
-  learn(idx - 1);
-  const o = S.owners[idx];
-
-  if (!o) {
-    /* unowned: buy? */
-    if (pl.cash >= p.price) {
-      if (!pl.cpu) {
-        setMsg(p.name + "（" + p.capital + "）に止まりました。" + p.property + "（特産品：" + p.specialty + "）が " + fmt(p.price) + "万円で買えます。県庁所在地クイズに正解すると2割引！");
-        const c = await humanChoice([
-          { label: "買う（クイズに挑戦）", cls: "primary" },
-          { label: "見送る" }
-        ]);
-        if (c === 0) {
-          const ok = await askQuiz(idx - 1, "capital");
-          const price = ok ? Math.round(p.price * 0.8) : p.price;
-          if (ok) log("あなた は県庁所在地クイズに正解し、2割引で購入");
-          pl.cash -= price;
-          S.owners[idx] = { player: pi, level: 1 };
-          log("あなた は " + p.name + " の " + p.property + " を " + fmt(price) + "万円で買収");
-          setMsg(p.property + " を " + fmt(price) + "万円で買いました！" + (ownsRegion(pi, p.region) ? " " + REGIONS[p.region].name + "を独占！ 収益2倍です。" : ""));
-          renderAll();
-          await wait(500);
-          return;
-        }
-        setMsg("見送りました。");
-        await wait(350);
-        return;
-      }
-      /* CPU */
-      if (pl.cash > p.price * 1.25 && Math.random() < 0.85) {
-        pl.cash -= p.price;
-        S.owners[idx] = { player: pi, level: 1 };
-        log(pl.name + " は " + p.name + " の " + p.property + " を買収（" + fmt(p.price) + "万円）");
-        setMsg(pl.name + " は " + p.name + " の " + p.property + " を買いました。");
-        renderAll();
-        await wait(450);
-        return;
-      }
-      setMsg(pl.name + " は " + p.name + " に止まりましたが、買いませんでした。");
-      await wait(350);
-      return;
-    }
-    setMsg(pl.name + " は " + p.name + " に止まりましたが、お金が足りず買えません。");
-    if (!pl.cpu) await wait(400); else await wait(300);
-    return;
-  }
-
-  if (o.player === pi) {
-    /* own property: level up? */
-    if (o.level < 3) {
-      const cost = Math.round(p.price * 0.5);
-      if (pl.cash >= cost) {
-        if (!pl.cpu) {
-          setMsg("自分の " + p.property + "（Lv" + o.level + " " + LEVEL_NAMES[o.level] + "）です。" + fmt(cost) + "万円で Lv" + (o.level + 1) + " " + LEVEL_NAMES[o.level + 1] + " にレベルアップできます。");
-          const c = await humanChoice([
-            { label: "レベルアップする（" + fmt(cost) + "万円）", cls: "gold" },
-            { label: "しない" }
-          ]);
-          if (c === 0) {
-            pl.cash -= cost;
-            o.level++;
-            log("あなた は " + p.name + " の " + p.property + " を Lv" + o.level + " に成長させた");
-            setMsg(p.property + " が Lv" + o.level + " " + LEVEL_NAMES[o.level] + " になりました！ 価値 " + fmt(propValue(idx)) + "万円。");
-            renderAll();
-            await wait(500);
-            return;
-          }
-          setMsg("レベルアップを見送りました。");
-          await wait(350);
-          return;
-        }
-        if (pl.cash > cost * 1.8 && Math.random() < 0.7) {
-          pl.cash -= cost;
-          o.level++;
-          log(pl.name + " は " + p.name + " の " + p.property + " を Lv" + o.level + " に成長させた");
-          setMsg(pl.name + " は " + p.property + " をレベルアップしました。");
-          renderAll();
-          await wait(450);
-          return;
-        }
-      }
-    }
-    setMsg(pl.name + " は自分の " + p.property + " に止まりました。");
-    await wait(300);
-    return;
-  }
-
-  /* someone else's property: pay rent */
-  const rent = rentOf(idx);
-  const owner = S.players[o.player];
-  pl.cash -= rent;
-  owner.cash += rent;
-  log(pl.name + " は " + owner.name + " の " + p.property + " に止まり、賃料 " + fmt(rent) + "万円を支払った");
-  setMsg(pl.name + " は " + owner.name + " の " + p.property + "（" + p.name + "）に止まり、賃料 " + fmt(rent) + "万円を払いました。" + (ownsRegion(o.player, p.region) ? "（地方独占で2倍）" : ""));
-  renderAll();
-  await wait(pl.cpu ? 450 : 700);
 }
 
 async function resolveArrival(pi){
@@ -1904,10 +1523,10 @@ async function resolveArrival(pi){
 async function playTurn(pi){
  const pl=S.players[pi];S.current=pi;renderStatus();centerMapOn(pl.pos);
  if(!pl.cpu){setMsg("あなたの番です。サイコロをタップしてください。");$("diceNote").textContent=pl.name+"の番";showWait("サイコロをタップしてね");await waitDiceClick("あなたの番！ サイコロをタップ");$("actions").innerHTML="";}
- else{setMsg(pl.name+"（CPU）の番です…");showWait(pl.name+"の番です");await wait(400);}
+ else{setMsg(pl.name+"（CPU）の番です…");showWait(pl.name+"の番です");showDice(pl.name+" の番");await wait(400);}
  const roll=1+Math.floor(Math.random()*6),dice=$("dice");dice.classList.remove("rolling");void dice.offsetWidth;dice.classList.add("rolling");
  for(let i=0;i<5;i++){renderDice(1+Math.floor(Math.random()*6));await wait(65);}renderDice(roll);$("diceNote").textContent=pl.name+"："+roll+" が出た";
- log(pl.name+" は "+roll+" マス進みます");if(!pl.cpu){await wait(1000);hideDice();}else{await wait(200);}
+ log(pl.name+" は "+roll+" マス進みます");if(!pl.cpu){await wait(1000);hideDice();}else{await wait(800);hideDice();}
  await movePlayer(pi,roll);
  await resolveArrival(pi);
  renderAll();
@@ -1927,9 +1546,12 @@ async function gameLoop(){
 function showResults(){
  gameRunning=false;showWait("ゲーム終了！");
  const rows=S.players.map((p,i)=>({i,owned:ownedCount(i),bonus:regionBonus(i),score:playerScore(i)})).sort((a,b)=>b.score-a.score||b.owned-a.owned);
- let html='<table class="rank-table"><tr><th>順位</th><th>プレイヤー</th><th>所有県</th><th>地方ボーナス</th><th>合計点</th></tr>';
- rows.forEach((r,i)=>html+="<tr"+(i===0?' class="winner"':"")+"><td>"+(i+1)+"位</td><td>"+S.players[r.i].name+"</td><td>"+r.owned+"点</td><td>+"+r.bonus+"点</td><td><b>"+r.score+"点</b></td></tr>");
- $("resultBody").innerHTML=html+"</table><p>12ターン終了！ 所有する都道府県1県につき1点、同じ地方を3県以上所有すると地方ごとに3点です。</p>";$("resultOverlay").hidden=false;
+ rows.forEach((r,idx)=>{r.rank=idx===0?1:((rows[idx-1].score===r.score&&rows[idx-1].owned===r.owned)?rows[idx-1].rank:idx+1);});
+ const tops=rows.filter(r=>r.rank===1);
+ const note=tops.length>1?('<p class="winner-note">🏆 同点優勝！ '+tops.map(r=>S.players[r.i].name).join(" と ")+' が優勝です！</p>'):('<p class="winner-note">🏆 '+S.players[tops[0].i].name+' が優勝です！</p>');
+ let html=note+'<table class="rank-table"><tr><th>順位</th><th>プレイヤー</th><th>所有県</th><th>地方ボーナス</th><th>合計点</th></tr>';
+ rows.forEach((r)=>html+="<tr"+(r.rank===1?' class="winner"':"")+"><td>"+r.rank+"位</td><td>"+S.players[r.i].name+"</td><td>"+r.owned+"県</td><td>+"+r.bonus+"点</td><td><b>"+r.score+"点</b></td></tr>");
+ $("resultBody").innerHTML=html+"</table><p>12ターン終了！ 所有する都道府県1県につき1点、同じ地方を3県以上所有すると地方ごとに3点です。同点（合計点も所有県数も同じ）の場合は全員が優勝です。</p>";$("resultOverlay").hidden=false;
 }
 
 function startGame(){
@@ -1943,7 +1565,7 @@ function startGame(){
 /* ================= init ================= */
 let gameRunning = false;
 $("dice").addEventListener("click", handleDiceClick);
-buildBoard();
+
 buildJapanMap($("japanMap"), $("mapInfo"));
 S = newState();
 renderAll();
