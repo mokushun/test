@@ -962,15 +962,33 @@ const ROAD_EDGES=[
 const ROAD_GRAPH=PREFS.map(()=>[]);
 ROAD_EDGES.forEach(([a,b,type,label])=>{const e={type:type||"road",label:label||"道路"};ROAD_GRAPH[a].push({to:b,edge:e});ROAD_GRAPH[b].push({to:a,edge:e});});
 function roadPoint(i){return i===46?{x:15.7,y:86.3}:MAP_POS[i];}
-function roadEdgePoints(a,b){
- if(a===0&&b===1)return [{x:64.2,y:28.9},{x:64.8,y:30.1}];
- if(a===34&&b===39)return [{x:16.6,y:75.8},{x:14.8,y:77.0}];
+function closestShorePoints(pathA,pathB){
+ if(!pathA||!pathB||!pathA.getTotalLength||!pathB.getTotalLength)return null;
+ const lenA=pathA.getTotalLength(),lenB=pathB.getTotalLength();
+ if(!lenA||!lenB)return null;
+ const samples=240;let best=null,bestD=Infinity;
+ const pointsA=[],pointsB=[];
+ for(let i=0;i<=samples;i++){
+  const a=pathA.getPointAtLength(lenA*i/samples),b=pathB.getPointAtLength(lenB*i/samples);
+  pointsA.push({x:a.x,y:a.y});pointsB.push({x:b.x,y:b.y});
+ }
+ for(const a of pointsA)for(const b of pointsB){
+  const dx=a.x-b.x,dy=a.y-b.y,d=dx*dx+dy*dy;
+  if(d<bestD){bestD=d;best=[a,b];}
+ }
+ return best;
+}
+function roadEdgePoints(a,b,prefPaths){
+ if((a===0&&b===1)||(a===34&&b===39)){
+  const shore=closestShorePoints(prefPaths[a],prefPaths[b]);
+  if(shore)return shore;
+ }
  return [roadPoint(a),roadPoint(b)];
 }
-function drawRoads(container){
+function drawRoads(container,prefPaths){
  const ns="http://www.w3.org/2000/svg",svg=document.createElementNS(ns,"svg");
  svg.setAttribute("viewBox","0 0 100 100");svg.setAttribute("preserveAspectRatio","none");svg.setAttribute("class","road-overlay");
- ROAD_EDGES.forEach(([a,b,type])=>{const [p,q]=roadEdgePoints(a,b),l=document.createElementNS(ns,"line");
+ ROAD_EDGES.forEach(([a,b,type])=>{const [p,q]=roadEdgePoints(a,b,prefPaths),l=document.createElementNS(ns,"line");
  l.setAttribute("x1",p.x);l.setAttribute("y1",p.y);l.setAttribute("x2",q.x);l.setAttribute("y2",q.y);
  l.setAttribute("class",type==="ferry"?"road ferry":type==="bridge"?"road bridge":"road");svg.appendChild(l);});
  container.appendChild(svg);
@@ -1249,7 +1267,7 @@ function buildJapanMap(container,infoEl){
  const inst={pins:[],prefPaths:[],prefLabels:[]};container.insertAdjacentHTML("afterbegin",prefSVG());
  const dec=document.createElement("div");dec.innerHTML='<span class="sea-label japansea">日本海</span><span class="sea-label pacific">太平洋</span><span class="north-arrow">▲<br>北</span>';while(dec.firstChild)container.appendChild(dec.firstChild);
  const inset=document.createElement("div");inset.className="okinawa-inset";inset.innerHTML=OKINAWA_SVG+'<span class="inset-label">沖縄</span>';container.appendChild(inset);
- inst.prefPaths=Array.from(container.querySelectorAll(".pref-shape"));drawRoads(container);
+ inst.prefPaths=Array.from(container.querySelectorAll(".pref-shape"));drawRoads(container,inst.prefPaths);
  PREFS.forEach((p,i)=>{if(i===46)return;const path=inst.prefPaths[i];if(!path)return;const box=path.getBBox();const label=document.createElement("span");label.className="pref-name-label";label.textContent=p.short;label.style.left=(box.x+box.width/2)+"%";label.style.top=(box.y+box.height/2)+"%";container.appendChild(label);inst.prefLabels.push(label);});
  PREFS.forEach((p,i)=>{const pos=MAP_POS[i],b=document.createElement("button");b.type="button";b.className="map-pin"+(pos.flip?" flip":"");b.style.setProperty("--rc",REGIONS[p.region].color);
  b.setAttribute("aria-label",p.name+"（県庁所在地："+p.capital+"）");b.innerHTML='<span class="cap-star">★</span><span class="cap-lab">'+p.short+'<span class="cap-name">'+p.capital+'</span></span><span class="pips"></span>';
