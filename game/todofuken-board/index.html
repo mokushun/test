@@ -313,6 +313,7 @@
       }
       .japan-map.large { max-width: 680px; aspect-ratio: 1 / 1; }
       #mapOverlay .sheet { max-width: 740px; }
+      .road-overlay{position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none;overflow:visible}.road{stroke:#fff;stroke-width:.72;opacity:.9}.road.bridge{stroke:#d58b28;stroke-width:1.05;stroke-dasharray:2.2 1.5}.road.ferry{stroke:#2786b8;stroke-width:1.15;stroke-dasharray:1.2 2.2}
       .prefmap {
         position: absolute; inset: 0; width: 100%; height: 100%;
         z-index: 0; pointer-events: none;
@@ -707,12 +708,13 @@
     </style>
   </head>
   <body>
-    <div class="wrap">\n      <header class="adventure-hero">
-        <div class="hero-mark" aria-hidden="true">🚅</div>
+    <div class="wrap">
+      <header class="adventure-hero">
+        <div class="hero-mark" aria-hidden="true">🛣️</div>
         <div class="hero-copy">
           <div class="hero-kicker">47 PREFECTURES QUEST</div>
           <h1>にほん全国たんけん！</h1>
-          <p>めざせ全国制覇！ きみだけの日本地図をつくろう</p>
+          <p>道路をたどって全国を旅しよう！ ご当地カードを集めよう</p>
         </div>
         <div class="hero-mascot" aria-hidden="true">🗾✨</div>
       </header>
@@ -752,13 +754,13 @@
             <div class="fact" id="factBox"></div>
           </div>
         </div>
-        <div class="map-legend">線＝県境、★＝県庁所在地の位置です。取得した県は、そのプレイヤーの色に塗られます。地図のピンをタップすると県庁所在地と特産品が見られます。</div>
+        <div class="map-legend">道路線＝移動ルート、破線＝橋・フェリーです。★＝県庁所在地。</div>
         <div class="player-colors" id="playerColors"></div>
         <div class="map-info" id="mapInfo"></div>
       </section>
 
       <details class="panel props-panel">
-        <summary>あなたの物件を見る</summary>
+        <summary>あなたの訪問記録</summary>
         <ul class="myprops" id="myProps"></ul>
       </details>
     </div>
@@ -767,19 +769,12 @@
     <div class="overlay" id="startOverlay">
       <div class="sheet">
         <h2>都道府県ボードゲーム</h2>
-        <p>サイコロで日本を一周しながら、47都道府県の<strong>特産品産業</strong>を買い集めるボードゲームです。CPU 3人と対戦します。</p>
+        <p>サイコロで道路を進み、47都道府県を旅するゲームです。初めて訪れた県のご当地カードを集めます。</p>
         <ul>
-          <li><strong>目的地</strong>に最初に着くと援助金がもらえます（通り過ぎず、ぴったり止まると到着です）</li>
-          <li><strong>物件</strong>を買うと、ほかの人が止まったときに賃料が入ります。同じ地方を全部そろえると収益2倍！</li>
-          <li>物件は<strong>レベルアップ</strong>（屋台→店舗→工場）で価値と賃料が上がります</li>
-          <li>買い物と目的地では<strong>地理クイズ</strong>が出ます。正解すると割引やボーナス！</li>
-          <li>スタートを一周すると<strong>決算</strong>：物件の収益が入ります</li>
-        </ul>
-        <h3>ゲームの長さ</h3>
-        <div class="len-row" id="lenRow">
-          <button type="button" data-len="12">1年（おためし）</button>
-          <button type="button" data-len="24" class="selected">2年（ふつう）</button>
-        </div>
+          <li>サイコロの数だけ道路を1県ずつ進みます</li><li>分かれ道では次の都道府県を選びます</li>
+          <li>初めて訪れた県ではご当地カードを獲得します</li><li>海峡・離島は橋やフェリーの特別ルートで接続します</li>
+        </ul><h3>プレイ人数</h3><div class="len-row" id="playerCountRow">
+          <button type="button" data-count="2" class="selected">2人</button><button type="button" data-count="3">3人</button><button type="button" data-count="4">4人</button></div>
         <div class="sticky-footer">
           <button type="button" class="primary big-start" id="startBtn">ゲームスタート</button>
         </div>
@@ -790,7 +785,7 @@
     <div class="overlay" id="mapOverlay" hidden>
       <div class="sheet">
         <h2>日本地図</h2>
-        <p style="margin-top:0;">線が県境、★が県庁所在地の位置です（沖縄県は左下の枠内にずらして表示）。取得した県は、そのプレイヤーの色に塗られます。ピンをタップすると、その都道府県の情報が見られます。</p>
+        <p style="margin-top:0;">道路線に沿って移動します。破線は橋・フェリーの特別ルートです。</p>
         <div class="japan-map large" id="japanMapLarge"></div>
         <div class="map-info" id="mapInfoLarge"></div>
         <div class="actions" style="margin-top:14px;">
@@ -943,6 +938,34 @@ const MAP_POS = [
   { x: 15.1, y: 90.1, flip: 1 },
   { x: 53.3, y: 47.7, inset: 1 }
 ];
+/* Verified adjacency graph; special sea/bridge links are explicitly marked. */
+const ROAD_EDGES=[
+/* 北海道・東北 */
+[0,1,"ferry","青函航路"],[1,2],[1,4],[2,3],[2,4],[3,4],[3,5],[3,6],[4,5],[5,6],[5,14],[6,7],[6,8],[6,14],[6,9],
+/* 関東・甲信越 */
+[7,8],[7,10],[7,11],[8,9],[8,10],[9,10],[9,14],[9,19],[10,11],[10,12],[10,18],[10,19],
+[11,12],[11,13,"bridge","東京湾アクアライン"],[12,13],[12,18],[13,18],[13,21],[14,15],[14,19],[15,16],[15,19],[15,20],[16,17],[16,20],[17,20],[17,24],[17,25],
+/* 中部・近畿 */
+[18,19],[18,21],[19,20],[19,21],[19,22],[20,22],[20,23],[20,24],[21,22],[22,23],[23,24],[23,25],[23,28],[23,29],
+[24,25],[25,26],[25,27],[25,28],[26,27],[26,28],[26,29],[27,30],[27,32],[28,29],
+/* 中国 */
+[30,31],[30,32],[30,33],[31,33],[31,34],[32,33],[33,34],
+/* 四国と本州を結ぶ橋 */
+[35,36],[35,37],[35,38],[36,37],[36,32,"bridge","瀬戸大橋"],[37,38],[37,33,"bridge","しまなみ海道"],[35,27,"bridge","大鳴門橋・明石海峡方面"],
+/* 九州・沖縄と海峡ルート */
+[34,39,"bridge","関門海峡道路"],[39,40],[39,42],[39,43],[40,41],[42,43],[42,44],[42,45],[43,44],[44,45],[45,46,"ferry","鹿児島〜沖縄航路"]
+];
+const ROAD_GRAPH=PREFS.map(()=>[]);
+ROAD_EDGES.forEach(([a,b,type,label])=>{const e={type:type||"road",label:label||"道路"};ROAD_GRAPH[a].push({to:b,edge:e});ROAD_GRAPH[b].push({to:a,edge:e});});
+function roadPoint(i){return i===46?{x:15.7,y:86.3}:MAP_POS[i];}
+function drawRoads(container){
+ const ns="http://www.w3.org/2000/svg",svg=document.createElementNS(ns,"svg");
+ svg.setAttribute("viewBox","0 0 100 100");svg.setAttribute("preserveAspectRatio","none");svg.setAttribute("class","road-overlay");
+ ROAD_EDGES.forEach(([a,b,type])=>{const p=roadPoint(a),q=roadPoint(b),l=document.createElementNS(ns,"line");
+ l.setAttribute("x1",p.x);l.setAttribute("y1",p.y);l.setAttribute("x2",q.x);l.setAttribute("y2",q.y);
+ l.setAttribute("class",type==="ferry"?"road ferry":type==="bridge"?"road bridge":"road");svg.appendChild(l);});
+ container.appendChild(svg);
+}
 const LEVEL_NAMES = ["", "屋台", "店舗", "工場"];
 const LEVEL_MULT = [0, 1, 1.6, 2.4];
 /* dice pips drawn with CSS dots (no reliance on dice glyph fonts) */
@@ -969,24 +992,10 @@ const EVENTS = [
 
 /* ================= state ================= */
 let S = null;
-function newState(totalRounds) {
-  return {
-    totalRounds: totalRounds,
-    round: 1,
-    current: 0,
-    players: [
-      { name: "あなた", color: "#d23b2e", initial: "あ", cash: 1500, pos: 0, cpu: false },
-      { name: "さくら", color: "#2f6fd0", initial: "さ", cash: 1500, pos: 0, cpu: true },
-      { name: "たけし", color: "#2e9e62", initial: "た", cash: 1500, pos: 0, cpu: true },
-      { name: "ゆき", color: "#dd8f2b", initial: "ゆ", cash: 1500, pos: 0, cpu: true }
-    ],
-    owners: {},   /* boardIdx -> {player, level} */
-    dest: -1,
-    destBonus: 0,
-    learned: {},  /* prefIdx -> true */
-    over: false,
-    busy: false
-  };
+let selectedPlayerCount = 2;
+function newState(){
+ const names=["あなた","さくら","たけし","ゆき"],colors=["#d23b2e","#2f6fd0","#2e9e62","#dd8f2b"];
+ return {current:0,turn:1,players:names.slice(0,selectedPlayerCount).map((name,i)=>({name,color:colors[i],initial:name[0],cpu:i>0,pos:36,visited:{},cards:0})),learned:{},over:false};
 }
 
 /* ================= helpers ================= */
@@ -1125,51 +1134,21 @@ function renderTiles() {
     }
   }
 }
-function renderStatus() {
-  const box = $("status");
-  box.innerHTML = "";
-  S.players.forEach((pl, pi) => {
-    const d = document.createElement("div");
-    d.className = "pcard" + (pi === S.current && !S.over ? " turn" : "");
-    d.style.setProperty("--pc", pl.color);
-    const owned = Object.keys(S.owners).filter((k) => S.owners[k].player === pi).length;
-    d.innerHTML =
-      '<div class="pname"><span class="pdot"></span>' + pl.name + (pl.cpu ? '<span class="cpu-tag">CPU</span>' : "") + "</div>" +
-      '<div class="pmoney' + (pl.cash < 0 ? " neg" : "") + '">' + fmt(pl.cash) + "万円</div>" +
-      '<div class="psub">総資産 ' + fmt(totalAssets(pi)) + "万 ・ 物件" + owned + "件</div>";
-    box.appendChild(d);
-  });
-  const dp = prefOf(S.dest);
-  $("destBanner").innerHTML =
-    '<span class="date-chip">' + dateLabel() + "（" + S.round + " / " + S.totalRounds + "ラウンド）</span>" +
-    "<span>目的地：<b>" + dp.name + "（" + dp.capital + "）</b></span>" +
-    '<span class="db-sub">先着ボーナス ' + fmt(S.destBonus) + "万円 ・ あなたはあと " + fwdDist(S.players[0].pos, S.dest) + "マス</span>";
-  $("centerSub").textContent = REGIONS[dp.region].name + " ・ 特産品：" + dp.specialty;
-  $("centerTitle").textContent = "目的地は " + dp.name + "（" + dp.capital + "）";
-  const explored = Object.keys(S.learned).length;
-  const count = $("exploreCount");
-  const bar = $("exploreBar");
-  if (count) count.textContent = explored + " / 47 県";
-  if (bar) bar.style.width = (explored / 47 * 100) + "%";
+function renderStatus(){
+ const box=$("status");box.innerHTML="";
+ S.players.forEach((pl,pi)=>{const d=document.createElement("div");d.className="pcard"+(pi===S.current&&!S.over?" turn":"");d.style.setProperty("--pc",pl.color);
+ const n=Object.keys(pl.visited).length;d.innerHTML='<div class="pname"><span class="pdot"></span>'+pl.name+(pl.cpu?'<span class="cpu-tag">CPU</span>':"")+'</div><div class="pmoney">'+n+' / 47県</div><div class="psub">訪問 '+n+'県 ・ カード '+pl.cards+'枚</div>';box.appendChild(d);});
+ const pl=S.players[S.current],p=PREFS[pl.pos];$("destBanner").innerHTML='<span class="date-chip">第'+S.turn+'ターン</span><span>現在地：<b>'+p.name+'</b></span>';
+ $("centerSub").textContent="道路ネットワークで全国をたんけん";$("centerTitle").textContent=pl.name+" は "+p.name+" にいます";
+ const n=Object.keys(S.learned).length;$("exploreCount").textContent=n+" / 47 県";$("exploreBar").style.width=(n/47*100)+"%";
 }
-function renderMyProps() {
-  const ul = $("myProps");
-  ul.innerHTML = "";
-  const mine = Object.keys(S.owners).filter((k) => S.owners[k].player === 0);
-  if (!mine.length) {
-    ul.innerHTML = '<li class="empty-note">まだ物件がありません。都道府県マスで特産品産業を買ってみましょう。</li>';
-    return;
-  }
-  mine.forEach((k) => {
-    const p = prefOf(+k);
-    const o = S.owners[k];
-    const li = document.createElement("li");
-    li.innerHTML =
-      "<span>" + p.name + "：" + p.property + ' <span class="lv">Lv' + o.level + " " + LEVEL_NAMES[o.level] + "</span></span>" +
-      "<span>価値 " + fmt(propValue(+k)) + "万</span>";
-    ul.appendChild(li);
-  });
+
+function renderMyProps(){
+ const ul=$("myProps");ul.innerHTML="";const keys=Object.keys(S.players[0].visited);
+ if(!keys.length){ul.innerHTML='<li class="empty-note">まだ訪問した県はありません。</li>';return;}
+ keys.sort((a,b)=>+a-+b).forEach(k=>{const li=document.createElement("li");li.textContent=PREFS[+k].name+" — "+PREFS[+k].specialty;ul.appendChild(li);});
 }
+
 function renderPlayerColors() {
   const box = $("playerColors");
   if (!box || !S) return;
@@ -1186,7 +1165,7 @@ function renderPlayerColors() {
   });
   const note = document.createElement("span");
   note.className = "pcolor-note";
-  note.textContent = "取得した県は、このプレイヤーカラーに塗られます";
+  note.textContent = "プレイヤーの位置と訪問した県を表示しています";
   box.appendChild(note);
 }
 function renderAll() { renderStatus(); renderTiles(); renderTokens(-1); renderMyProps(); renderPlayerColors(); renderMaps(); }
@@ -1257,96 +1236,32 @@ function prefSVG() {
 const OKINAWA_SVG =
   '<svg class="prefmap" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">' +
   '<path class="pref-shape" data-pref="46" d="' + OKINAWA_PATH + '"/></svg>';
-function buildJapanMap(container, infoEl) {
-  const inst = { pins: [], prefPaths: [] };
-  container.insertAdjacentHTML("afterbegin", prefSVG());
-  const dec = document.createElement("div");
-  dec.innerHTML =
-    '<span class="sea-label japansea">日本海</span>' +
-    '<span class="sea-label pacific">太平洋</span>' +
-    '<span class="north-arrow">▲<br>北</span>';
-  while (dec.firstChild) container.appendChild(dec.firstChild);
-  const inset = document.createElement("div");
-  inset.className = "okinawa-inset";
-  inset.innerHTML = OKINAWA_SVG + '<span class="inset-label">沖縄</span>';
-  container.appendChild(inset);
-  inst.prefPaths = Array.prototype.slice.call(container.querySelectorAll(".pref-shape"));
-  PREFS.forEach((p, i) => {
-    const pos = MAP_POS[i];
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "map-pin" + (pos.flip ? " flip" : "");
-    b.style.setProperty("--rc", REGIONS[p.region].color);
-    b.setAttribute("aria-label", p.name + "（県庁所在地：" + p.capital + "）");
-    b.innerHTML =
-      '<span class="cap-star" aria-hidden="true">★</span>' +
-      '<span class="cap-lab">' + p.short + '<span class="cap-name">' + p.capital + "</span></span>" +
-      '<span class="pips"></span>';
-    if (pos.inset) {
-      b.style.left = pos.x + "%";
-      b.style.top = pos.y + "%";
-      inset.appendChild(b);
-    } else {
-      b.style.left = pos.x + "%";
-      b.style.top = pos.y + "%";
-      container.appendChild(b);
-    }
-    b.addEventListener("click", () => selectPrefOnMap(i));
-    inst.pins.push(b);
-  });
-  inst.infoEl = infoEl;
-  mapInstances.push(inst);
-  return inst;
+function buildJapanMap(container,infoEl){
+ const inst={pins:[],prefPaths:[]};container.insertAdjacentHTML("afterbegin",prefSVG());
+ const dec=document.createElement("div");dec.innerHTML='<span class="sea-label japansea">日本海</span><span class="sea-label pacific">太平洋</span><span class="north-arrow">▲<br>北</span>';while(dec.firstChild)container.appendChild(dec.firstChild);
+ const inset=document.createElement("div");inset.className="okinawa-inset";inset.innerHTML=OKINAWA_SVG+'<span class="inset-label">沖縄</span>';container.appendChild(inset);
+ inst.prefPaths=Array.from(container.querySelectorAll(".pref-shape"));drawRoads(container);
+ PREFS.forEach((p,i)=>{const pos=MAP_POS[i],b=document.createElement("button");b.type="button";b.className="map-pin"+(pos.flip?" flip":"");b.style.setProperty("--rc",REGIONS[p.region].color);
+ b.setAttribute("aria-label",p.name+"（県庁所在地："+p.capital+"）");b.innerHTML='<span class="cap-star">★</span><span class="cap-lab">'+p.short+'<span class="cap-name">'+p.capital+'</span></span><span class="pips"></span>';
+ b.style.left=pos.x+"%";b.style.top=pos.y+"%";(pos.inset?inset:container).appendChild(b);b.addEventListener("click",()=>selectPrefOnMap(i));inst.pins.push(b);});
+ inst.infoEl=infoEl;mapInstances.push(inst);return inst;
 }
-function mapInfoHTML(prefIdx) {
-  const p = PREFS[prefIdx];
-  let html =
-    "<b>" + p.name + "</b>（" + REGIONS[p.region].name + "）　県庁所在地：<b>" + p.capital + "</b>　特産品：" + p.specialty;
-  if (S.learned[prefIdx]) html += "<br>" + p.fact;
-  else html += "<br>まだ訪れていません。マスに止まると情報が見られます。";
-  const ow = S.owners[prefIdx + 1];
-  if (ow) html += "<br>" + S.players[ow.player].name + " の物件です（" + p.property + " Lv" + ow.level + " " + LEVEL_NAMES[ow.level] + "）。";
-  if (S.dest === prefIdx + 1) html += "<br>いまの目的地です！";
-  return html;
+
+function mapInfoHTML(i){
+ const p=PREFS[i],links=ROAD_GRAPH[i].map(x=>PREFS[x.to].name+(x.edge.type==="road"?"":"（"+x.edge.label+"）")).join("、");
+ const visitors=S.players.filter(pl=>pl.visited[i]).map(pl=>pl.name).join("・");
+ return "<b>"+p.name+"</b>（"+REGIONS[p.region].name+"） 県庁所在地："+p.capital+" 特産品："+p.specialty+"<br>"+(visitors?"訪問："+visitors:"未訪問")+"<br>道路接続："+links;
 }
+
 function selectPrefOnMap(prefIdx) {
   selectedPref = prefIdx;
   mapInstances.forEach((inst) => { if (inst.infoEl) inst.infoEl.innerHTML = mapInfoHTML(prefIdx); });
 }
-function renderMaps() {
-  if (!S) return;
-  mapInstances.forEach((inst) => {
-    if (inst.prefPaths) {
-      inst.prefPaths.forEach((path) => {
-        const i = +path.getAttribute("data-pref");
-        const o = S.owners[i + 1];
-        path.style.fill = o ? S.players[o.player].color : "";
-        path.classList.toggle("dest-pref", S.dest === i + 1);
-      });
-    }
-    inst.pins.forEach((pin, i) => {
-      const o = S.owners[i + 1];
-      pin.classList.toggle("owned", !!o);
-      if (o) pin.style.setProperty("--pc", S.players[o.player].color);
-      pin.classList.toggle("dest", S.dest === i + 1);
-      const pips = pin.querySelector(".pips");
-      pips.innerHTML = "";
-      S.players.forEach((pl, ppi) => {
-        if (pl.pos === i + 1) {
-          const s = document.createElement("span");
-          s.className = "pip-player";
-          s.setAttribute("data-player", ppi);
-          s.style.background = pl.color;
-          s.textContent = pl.initial;
-          pips.appendChild(s);
-        }
-      });
-    });
-    if (inst.infoEl) {
-      const target = selectedPref >= 0 ? selectedPref : (S.dest > 0 ? S.dest - 1 : 0);
-      inst.infoEl.innerHTML = mapInfoHTML(target);
-    }
-  });
+function renderMaps(){
+ if(!S)return;mapInstances.forEach(inst=>{inst.pins.forEach((pin,i)=>{const pips=pin.querySelector(".pips");pips.innerHTML="";
+ S.players.forEach((pl,pi)=>{if(pl.pos===i){const d=document.createElement("span");d.className="pip-player";d.setAttribute("data-player",pi);d.style.background=pl.color;d.textContent=pl.initial;pips.appendChild(d);}});
+ pin.classList.toggle("owned",!!S.learned[i]);});
+ if(inst.infoEl)inst.infoEl.innerHTML=mapInfoHTML(selectedPref>=0?selectedPref:S.players[S.current].pos);});
 }
 
 /* ================= quiz ================= */
@@ -1468,20 +1383,16 @@ function handleDiceClick() {
   r();
 }
 
-async function movePlayer(pi, steps) {
-  const pl = S.players[pi];
-  let passedStart = false;
-  let arrived = false;
-  for (let s = 0; s < steps; s++) {
-    pl.pos = (pl.pos + 1) % BOARD_LEN;
-    if (pl.pos === 0) passedStart = true;
-    renderTokens(pi);
-    renderStatus();
-    await wait(pl.cpu ? 110 : 150);
-    if (pl.pos === S.dest) { arrived = true; break; }
-  }
-  renderTokens(-1);
-  return { passedStart, arrived };
+async function movePlayer(pi,steps){
+ const pl=S.players[pi];
+ for(let n=0;n<steps;n++){
+  const opts=ROAD_GRAPH[pl.pos];if(!opts.length)throw Error(PREFS[pl.pos].name+"から接続道路がありません");
+  let chosen=opts[0];
+  if(opts.length>1&&!pl.cpu){const pick=await humanChoice(opts.map(o=>({label:PREFS[o.to].name+(o.edge.type==="road"?"":"（"+o.edge.label+"）")})));chosen=opts[pick];}
+  else if(pl.cpu)chosen=opts[Math.floor(Math.random()*opts.length)];
+  pl.pos=chosen.to;const first=!pl.visited[pl.pos];pl.visited[pl.pos]=true;S.learned[pl.pos]=true;if(first)pl.cards++;
+  renderTokens(pi);renderStatus();renderMaps();setMsg(pl.name+" は "+PREFS[pl.pos].name+" に到着。"+(first?"初訪問カードを獲得！":""));await wait(pl.cpu?170:220);
+ }
 }
 
 async function settlement(pi) {
@@ -1645,104 +1556,31 @@ async function resolveTile(pi) {
   await wait(pl.cpu ? 450 : 700);
 }
 
-async function playTurn(pi) {
-  const pl = S.players[pi];
-  S.current = pi;
-  renderStatus();
-  let roll;
-  if (!pl.cpu) {
-    setMsg("あなたの番です。地図の右下の窓にあるサイコロをタップしてください。");
-    $("diceNote").textContent = pl.name + "の番";
-    showWait("サイコロをタップしてね");
-    await waitDiceClick();
-    $("actions").innerHTML = "";
-    roll = 1 + Math.floor(Math.random() * 6);
-    const diceEl = $("dice");
-    diceEl.classList.remove("rolling");
-    void diceEl.offsetWidth;
-    diceEl.classList.add("rolling");
-    for (let i = 0; i < 6; i++) {
-      renderDice(1 + Math.floor(Math.random() * 6));
-      await wait(70);
-    }
-    renderDice(roll);
-  } else {
-    setMsg(pl.name + " の番です。");
-    $("diceNote").textContent = pl.name + "の番";
-    showWait(pl.name + "（CPU）の番です…");
-    await wait(550);
-    roll = 1 + Math.floor(Math.random() * 6);
-    renderDice(roll);
-  }
-  $("diceNote").textContent = pl.name + "：" + roll + " が出た";
-  log(pl.name + " はサイコロで " + roll + " を出した");
-  await wait(350);
-
-  const res = await movePlayer(pi, roll);
-  if (res.passedStart) await settlement(pi);
-  if (res.arrived) await arriveDestination(pi);
-  await resolveTile(pi);
-  renderAll();
+async function playTurn(pi){
+ const pl=S.players[pi];S.current=pi;renderStatus();
+ if(!pl.cpu){setMsg("あなたの番です。サイコロをタップしてください。");$("diceNote").textContent=pl.name+"の番";showWait("サイコロをタップしてね");await waitDiceClick();$("actions").innerHTML="";}
+ else{setMsg(pl.name+"（CPU）の番です…");showWait(pl.name+"の番です");await wait(400);}
+ const roll=1+Math.floor(Math.random()*6),dice=$("dice");dice.classList.remove("rolling");void dice.offsetWidth;dice.classList.add("rolling");
+ for(let i=0;i<5;i++){renderDice(1+Math.floor(Math.random()*6));await wait(65);}renderDice(roll);$("diceNote").textContent=pl.name+"："+roll+" が出た";
+ log(pl.name+" は "+roll+" マス進みます");await wait(200);await movePlayer(pi,roll);renderAll();
+ const p=PREFS[pl.pos];$("factBox").innerHTML="<b>"+p.name+"：</b>"+p.fact+"<br>特産品："+p.specialty;
 }
 
-async function gameLoop() {
-  while (!S.over) {
-    for (let pi = 0; pi < 4; pi++) {
-      await playTurn(pi);
-      if (S.round >= S.totalRounds && pi === 3) { S.over = true; break; }
-    }
-    if (!S.over) S.round++;
-    renderStatus();
-  }
-  showResults();
+async function gameLoop(){
+ S.turn=1;while(!S.over){for(let i=0;i<S.players.length;i++)await playTurn(i);S.turn++;if(S.turn>12)S.over=true;}showResults();
 }
 
-function showResults() {
-  gameRunning = false;
-  showWait("ゲーム終了！ おつかれさまでした");
-  /* final settlement for everyone */
-  const rows = S.players.map((pl, pi) => {
-    let income = 0;
-    for (const k in S.owners) {
-      if (S.owners[k].player === pi) {
-        let v = propValue(+k) * 0.12;
-        if (ownsRegion(pi, prefOf(+k).region)) v *= 2;
-        income += Math.round(v);
-      }
-    }
-    pl.cash += income;
-    return { pi, income, assets: totalAssets(pi) };
-  });
-  rows.sort((a, b) => b.assets - a.assets);
-  renderAll();
-  const learnedCount = Object.keys(S.learned).length;
-  let html = '<table class="rank-table"><tr><th>順位</th><th>プレイヤー</th><th class="num">最終収益</th><th class="num">総資産</th></tr>';
-  rows.forEach((r, i) => {
-    const pl = S.players[r.pi];
-    html += "<tr" + (i === 0 ? ' class="winner"' : "") + "><td>" + (i + 1) + "位" + (i === 0 ? ' <span class="crown">★優勝</span>' : "") + "</td><td>" + pl.name + '</td><td class="num">+' + fmt(r.income) + '万円</td><td class="num">' + fmt(r.assets) + "万円</td></tr>";
-  });
-  html += "</table>";
-  html += "<p>あなたは 47都道府県のうち <b>" + learnedCount + "県</b> を訪れました。" +
-    (rows[0].pi === 0 ? " 優勝おめでとうございます！" : " 次は地方独占と目的地ボーナスを狙ってみましょう。") + "</p>";
-  $("resultBody").innerHTML = html;
-  $("resultOverlay").hidden = false;
-  setMsg("ゲーム終了！ 最終結果を見てください。");
+function showResults(){
+ gameRunning=false;showWait("ゲーム終了！");const rows=S.players.map((p,i)=>({i,n:Object.keys(p.visited).length,c:p.cards})).sort((a,b)=>b.n-a.n||b.c-a.c);
+ let html='<table class="rank-table"><tr><th>順位</th><th>プレイヤー</th><th>訪問県</th><th>カード</th></tr>';
+ rows.forEach((r,i)=>html+="<tr"+(i===0?' class="winner"':"")+"><td>"+(i+1)+"位</td><td>"+S.players[r.i].name+"</td><td>"+r.n+"県</td><td>"+r.c+"枚</td></tr>");
+ $("resultBody").innerHTML=html+"</table><p>訪問した都道府県とカード枚数で集計しました。</p>";$("resultOverlay").hidden=false;
 }
 
-function startGame(totalRounds) {
-  S = newState(totalRounds);
-  chooseDestination(0);
-  renderAll();
-  renderDice(1);
-  const dp = prefOf(S.dest);
-  log("ゲームスタート！ 最初の目的地は " + dp.name + "（" + dp.capital + "）");
-  setMsg("ゲームスタート！ 目的地は " + dp.name + "（" + dp.capital + "）。あなたの番です。地図の右下の窓で光っているサイコロをタップしてください。");
-  gameLoop().catch((err) => {
-    if (window.console && console.error) console.error(err);
-    gameRunning = false;
-    setMsg("途中でエラーが起きて止まりました。ページを再読み込みして、もう一度「ゲームスタート」を押してください。");
-    showWait("止まってしまいました。ページを再読み込みしてください");
-  });
+function startGame(){
+ S=newState();S.turn=1;S.players.forEach(p=>{p.visited[36]=true;});S.learned[36]=true;renderAll();renderDice(1);
+ log("ゲームスタート！ 全員が香川県から出発します。");setMsg("道路を進んで全国をたんけんしよう。分かれ道では進む県を選べます。");
+ gameLoop().catch(err=>{if(window.console)console.error(err);gameRunning=false;setMsg("エラーで停止しました："+err.message);showWait("再読み込みしてください");});
 }
 
 /* ================= init ================= */
@@ -1753,23 +1591,16 @@ buildJapanMap($("japanMap"), $("mapInfo"));
 buildJapanMap($("japanMapLarge"), $("mapInfoLarge"));
 $("mapZoomBtn").addEventListener("click", () => { $("mapOverlay").hidden = false; renderMaps(); });
 $("mapCloseBtn").addEventListener("click", () => { $("mapOverlay").hidden = true; });
-S = newState(24);
-chooseDestination(0);
+S = newState();
 renderAll();
 renderDice(1);
 
-let chosenLen = 24;
-$("lenRow").querySelectorAll("button").forEach((b) => {
-  b.addEventListener("click", () => {
-    chosenLen = +b.dataset.len;
-    $("lenRow").querySelectorAll("button").forEach((x) => x.classList.toggle("selected", x === b));
-  });
-});
+$("playerCountRow").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{selectedPlayerCount=+b.dataset.count;$("playerCountRow").querySelectorAll("button").forEach(x=>x.classList.toggle("selected",x===b));}));
 $("startBtn").addEventListener("click", () => {
   if (gameRunning) return;
   gameRunning = true;
   $("startOverlay").hidden = true;
-  startGame(chosenLen);
+  startGame();
 });
 $("againBtn").addEventListener("click", () => {
   gameRunning = false;
