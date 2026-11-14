@@ -314,11 +314,11 @@
       .japan-map.large { width: 2040px; height: 2040px; max-width: none; aspect-ratio: auto; margin: 0; }
       .map-scroll { width: 100%; height: 100%; overflow: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; border: 1px solid var(--line); border-radius: 10px; background: var(--sea); touch-action: pan-x pan-y; }
       .map-scroll .japan-map.large { border: 0; border-radius: 0; }
-      .japan-map.large .road { stroke-width: 0.42; }
-      .japan-map.large .road.bridge { stroke-width: 0.62; }
-      .japan-map.large .road.ferry { stroke-width: 0.68; }
-      .japan-map.large .prefmap path { stroke-width: 0.28; }
-      .japan-map.large .prefmap path.dest-pref { stroke-width: 0.65; }
+      .japan-map.large .road { stroke-width: 0.16; }
+      .japan-map.large .road.bridge { stroke-width: 0.24; }
+      .japan-map.large .road.ferry { stroke-width: 0.26; }
+      .japan-map.large .prefmap path { stroke-width: 0.16; }
+      .japan-map.large .prefmap path.dest-pref { stroke-width: 0.32; }
       .road-overlay{position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none;overflow:visible}.road{stroke:#fff;stroke-width:.72;opacity:.9}.road.bridge{stroke:#d58b28;stroke-width:1.05;stroke-dasharray:2.2 1.5}.road.ferry{stroke:#2786b8;stroke-width:1.15;stroke-dasharray:1.2 2.2}
       .prefmap {
         position: absolute; inset: 0; width: 100%; height: 100%;
@@ -366,7 +366,7 @@
         color: #f5a623;
         text-shadow: 0 0 2px #fff, 0 0 2px #fff, 1px 0 1px rgba(60,40,0,0.55), -1px 0 1px rgba(60,40,0,0.55), 0 1px 1px rgba(60,40,0,0.55), 0 -1px 1px rgba(60,40,0,0.55);
       }
-      .japan-map.large .cap-star { font-size: 15px; }
+      .japan-map.large .cap-star { font-size: 12px; }
       .map-pin .cap-lab {
         background: var(--map-chip); color: var(--ink);
         border: 1.5px solid var(--rc, var(--accent));
@@ -377,8 +377,14 @@
       .map-pin .cap-lab .cap-name {
         display: none; font-weight: 600; color: var(--ink-soft); font-size: 0.88em; line-height: 1.2;
       }
-      .japan-map.large .cap-lab .cap-name { display: none; }
-      .japan-map.large .cap-lab { font-size: 10px; line-height: 1.1; padding: 1px 2px; border-width: 0.8px; border-radius: 3px; }
+      .japan-map.large .cap-lab { display: none; }
+      .pref-name-label { display: none; }
+      .japan-map.large .pref-name-label {
+        display: block; position: absolute; z-index: 4; transform: translate(-50%, -50%);
+        color: #24351f; font-size: 8px; font-weight: 800; line-height: 1;
+        white-space: nowrap; pointer-events: none;
+        text-shadow: 0 0 2px #fff, 0 0 3px #fff, 0 1px 2px #fff;
+      }
       .japan-map.large .map-pin { gap: 0; }
       .map-pin.owned .cap-lab { background: var(--pc, var(--rc)); color: #fff; border-color: var(--pc, var(--rc)); }
       .map-pin.owned .cap-lab .cap-name { color: rgba(255,255,255,0.9); }
@@ -1235,10 +1241,11 @@ const OKINAWA_SVG =
   '<svg class="prefmap" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">' +
   '<path class="pref-shape" data-pref="46" d="' + OKINAWA_PATH + '"/></svg>';
 function buildJapanMap(container,infoEl){
- const inst={pins:[],prefPaths:[]};container.insertAdjacentHTML("afterbegin",prefSVG());
+ const inst={pins:[],prefPaths:[],prefLabels:[]};container.insertAdjacentHTML("afterbegin",prefSVG());
  const dec=document.createElement("div");dec.innerHTML='<span class="sea-label japansea">日本海</span><span class="sea-label pacific">太平洋</span><span class="north-arrow">▲<br>北</span>';while(dec.firstChild)container.appendChild(dec.firstChild);
  const inset=document.createElement("div");inset.className="okinawa-inset";inset.innerHTML=OKINAWA_SVG+'<span class="inset-label">沖縄</span>';container.appendChild(inset);
  inst.prefPaths=Array.from(container.querySelectorAll(".pref-shape"));drawRoads(container);
+ PREFS.forEach((p,i)=>{if(i===46)return;const path=inst.prefPaths[i];if(!path)return;const box=path.getBBox();const label=document.createElement("span");label.className="pref-name-label";label.textContent=p.short;label.style.left=(box.x+box.width/2)+"%";label.style.top=(box.y+box.height/2)+"%";container.appendChild(label);inst.prefLabels.push(label);});
  PREFS.forEach((p,i)=>{const pos=MAP_POS[i],b=document.createElement("button");b.type="button";b.className="map-pin"+(pos.flip?" flip":"");b.style.setProperty("--rc",REGIONS[p.region].color);
  b.setAttribute("aria-label",p.name+"（県庁所在地："+p.capital+"）");b.innerHTML='<span class="cap-star">★</span><span class="cap-lab">'+p.short+'<span class="cap-name">'+p.capital+'</span></span><span class="pips"></span>';
  b.style.left=pos.x+"%";b.style.top=pos.y+"%";(pos.inset?inset:container).appendChild(b);b.addEventListener("click",()=>selectPrefOnMap(i));inst.pins.push(b);});
