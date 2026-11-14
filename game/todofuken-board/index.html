@@ -786,6 +786,17 @@
 .fdot.red { background:#d23b2e; width:92%; }
 .dice.clickable .dice-cube { animation:cubeWiggle 1.15s ease-in-out infinite; }
 @keyframes cubeWiggle { 0%,100%{ margin-top:0; } 50%{ margin-top:-5px; } }
+
+/* ===== game effects (GAME_EFFECTS_TASK stage 1-2, 2026-11-14) ===== */
+.splash-inner { position:relative; }
+.splash-get { background:linear-gradient(150deg,#e8930c,#f4bd4c); }
+.splash-fx { position:absolute; inset:0; overflow:visible; pointer-events:none; }
+.confetti { position:absolute; top:-10px; width:9px; height:14px; border-radius:2px; opacity:0; animation:confettiFall 1.15s ease-in forwards; }
+@keyframes confettiFall { 0%{ opacity:1; transform:translateY(0) rotate(0deg); } 100%{ opacity:0; transform:translateY(130px) rotate(340deg); } }
+.map-pin.just-got { z-index:35; }
+.map-pin.just-got .cap-star { animation:justGotPulse .48s ease-in-out 3; }
+@keyframes justGotPulse { 50%{ transform:scale(1.55) rotate(18deg); filter:drop-shadow(0 0 7px #ffd94d); } }
+@media (prefers-reduced-motion: reduce) { .dice-cube { transition-duration:.25s; } .confetti { display:none; } }
 </style>
   </head>
   <body>
@@ -876,6 +887,7 @@
     <!-- center splash -->
     <div class="splash" id="splash" hidden>
       <div class="splash-inner splash-duel">
+        <div class="splash-fx" id="splashFx"></div>
         <div class="splash-title" id="splashTitle"></div>
         <div class="splash-sub" id="splashSub"></div>
       </div>
@@ -1197,6 +1209,12 @@ function showSplash(title,sub,kind,ms){
   $("splashSub").textContent=sub||"";
   const inner=sp.querySelector(".splash-inner");
   inner.className="splash-inner splash-"+(kind||"duel");
+  const fx=$("splashFx");
+  if(fx){fx.innerHTML="";
+   if(kind==="get"){const colors=["#f4bd4c","#e4572e","#3f7fbf","#43a05a","#ff5b8d","#ffffff"];
+    for(let i=0;i<16;i++){const s=document.createElement("span");s.className="confetti";
+     s.style.left=(3+Math.random()*94)+"%";s.style.background=colors[i%colors.length];
+     s.style.animationDelay=(Math.random()*0.25)+"s";fx.appendChild(s);}}}
   sp.hidden=false;
   inner.classList.remove("splash-anim");void inner.offsetWidth;inner.classList.add("splash-anim");
   setTimeout(()=>{sp.hidden=true;res();},ms||1600);
@@ -1205,8 +1223,28 @@ function showSplash(title,sub,kind,ms){
 async function rollDiceAnimated(){
  const v=1+Math.floor(Math.random()*6);
  setDiceFace(v,true);
+ const dice=$("dice");
+ const reduced=window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+ if(dice&&dice.animate&&!reduced){
+  dice.getAnimations().forEach(a=>a.cancel());
+  const dx=(Math.random()<0.5?-1:1)*(36+Math.random()*46);
+  const dy=-(16+Math.random()*26);
+  dice.animate([
+   {transform:"translate(0px,0px) scale(1,1)"},
+   {transform:"translate("+(dx*0.55)+"px,"+dy+"px) scale(1,1)",offset:0.42},
+   {transform:"translate("+dx+"px,0px) scale(1,1)",offset:0.78},
+   {transform:"translate("+dx+"px,0px) scale(1.14,0.84)",offset:0.87},
+   {transform:"translate(0px,0px) scale(1,1)",offset:1}
+  ],{duration:1000,easing:"ease-out",fill:"none"});
+ }
  await wait(1050);
  return v;
+}
+function flashPin(idx){
+ const pins=document.querySelectorAll("#japanMap .map-pin");
+ const pin=pins&&pins[idx];if(!pin)return;
+ pin.classList.remove("just-got");void pin.offsetWidth;pin.classList.add("just-got");
+ setTimeout(()=>pin.classList.remove("just-got"),1500);
 }
 function showCardPopup(k,title){
  return new Promise(res=>{
@@ -1495,6 +1533,8 @@ async function resolveArrival(pi){
   S.owners[idx]=pi;pl.cards++;gainTitle=p.name+"カードを ゲット！";
   setMsg(pl.name+" が "+p.name+" を獲得！「"+p.specialty+"」カードを手に入れました。");
   log(pl.name+" が "+p.name+" を新たに獲得");
+  renderAll();flashPin(idx);
+  await showSplash(p.name+" GET！",pl.name+" が獲得！","get",pl.cpu?850:1250);
  }else if(owner===pi){
   setMsg(pl.name+" は自分の "+p.name+" に到着しました。");
   log(pl.name+" は自分の "+p.name+" に到着");
@@ -1551,11 +1591,14 @@ async function resolveArrival(pi){
   }
   if(!pl.cpu||!defender.cpu){
    let sTitle,sSub,sKind;
-   if(!pl.cpu&&won){sTitle="🎉 勝った！";sSub=p.name+" を うばった！";sKind="win";}
+   if(!pl.cpu&&won){sTitle="🎉 "+p.name+" GET！";sSub=p.name+" を うばった！";sKind="get";}
    else if(!pl.cpu&&!won){sTitle="💦 防衛された…";sSub=defender.name+" が "+p.name+" を守りきった";sKind="lose";}
    else if(won){sTitle="😱 うばわれた…";sSub=p.name+" を "+pl.name+" に取られた";sKind="lose";}
    else{sTitle="🛡️ 防衛成功！";sSub=p.name+" を守った！";sKind="win";}
    await showSplash(sTitle,sSub+"（"+attack+" 対 "+defense+"）",sKind,2000);
+  }else if(won){
+   renderAll();flashPin(idx);
+   await showSplash(p.name+" GET！",pl.name+" が "+defender.name+" から奪取！","get",850);
   }
  }
  renderAll();
