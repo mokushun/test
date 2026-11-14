@@ -768,7 +768,7 @@
 
 /* ===== fork-choice tap reliability (2026-11-14) ===== */
 #japanMap.choosing .map-pin { opacity:.28; }
-#japanMap.choosing .map-pin.choice-target { opacity:1; padding:16px; }
+#japanMap.choosing .map-pin.choice-target { opacity:1; padding:20px; }
 .map-pin.choice-picked { animation:pickedFlash .8s ease; }
 @keyframes pickedFlash { 0%{ filter:brightness(1);} 30%{ filter:brightness(1.9) drop-shadow(0 0 12px #ffd23f);} 100%{ filter:brightness(1);} }
 
@@ -1292,7 +1292,7 @@ function buildJapanMap(container,infoEl){
   const label=document.createElement("span");label.className="pref-name-label";label.textContent=p.short;label.style.left=(bc?bc.x:MAP_POS[i].x)+"%";label.style.top=(bc?bc.y:MAP_POS[i].y)+"%";container.appendChild(label);inst.prefLabels.push(label);});
  PREFS.forEach((p,i)=>{const pos=MAP_POS[i],b=document.createElement("button");b.type="button";b.className="map-pin"+(pos.flip?" flip":"");b.style.setProperty("--rc",REGIONS[p.region].color);
  b.setAttribute("aria-label",p.name+"（県庁所在地："+p.capital+"）");b.innerHTML='<span class="cap-star">★</span><span class="cap-lab">'+p.short+'<span class="cap-name">'+p.capital+'</span></span><span class="pips"></span>';
- b.style.left=pos.x+"%";b.style.top=pos.y+"%";(pos.inset?inset:container).appendChild(b);b.addEventListener("pointerdown",(e)=>{pinPress={i:i,x:e.clientX,y:e.clientY};});b.addEventListener("pointerup",(e)=>{if(pinPress&&pinPress.i===i&&Math.hypot(e.clientX-pinPress.x,e.clientY-pinPress.y)<12){pinPress=null;lastPinTap={i:i,t:Date.now()};handlePinClick(i);}});b.addEventListener("pointercancel",()=>{pinPress=null;});b.addEventListener("click",()=>{if(lastPinTap.i===i&&Date.now()-lastPinTap.t<700)return;handlePinClick(i);});inst.pins.push(b);});
+ b.style.left=pos.x+"%";b.style.top=pos.y+"%";(pos.inset?inset:container).appendChild(b);b.addEventListener("pointerdown",(e)=>{if(mapChoice&&mapChoice.targets.has(i)){pinPress=null;lastPinTap={i:i,t:Date.now()};handlePinClick(i);return;}pinPress={i:i,x:e.clientX,y:e.clientY};});b.addEventListener("pointerup",(e)=>{if(pinPress&&pinPress.i===i&&Math.hypot(e.clientX-pinPress.x,e.clientY-pinPress.y)<12){pinPress=null;lastPinTap={i:i,t:Date.now()};handlePinClick(i);}});b.addEventListener("pointercancel",()=>{pinPress=null;});b.addEventListener("click",()=>{if(lastPinTap.i===i&&Date.now()-lastPinTap.t<700)return;handlePinClick(i);});inst.pins.push(b);});
  inst.infoEl=infoEl;mapInstances.push(inst);return inst;
 }
 
@@ -1569,6 +1569,7 @@ function startGame(){
 /* ================= init ================= */
 let gameRunning = false;
 $("dice").addEventListener("click", handleDiceClick);
+$("dice").addEventListener("pointerdown", handleDiceClick);
 
 buildJapanMap($("japanMap"), $("mapInfo"));
 S = newState();
