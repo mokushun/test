@@ -775,6 +775,17 @@
 .splash-sub { font-size:clamp(14px,3.6vw,19px); font-weight:700; margin-top:6px; }
 .splash-anim { animation:splashPop .45s ease-out; }
 @keyframes splashPop { 0% { transform:scale(.55); opacity:0; } 60% { transform:scale(1.07); opacity:1; } 100% { transform:scale(1); opacity:1; } }
+
+/* ===== info strip + center dice overlay (2026-11-14) ===== */
+.info-strip { margin-top:8px; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:8px 10px; }
+.dice-overlay { z-index:70; }
+.dice-sheet { text-align:center; max-width:340px; margin:0 auto; }
+.dice-sheet .dice-wrap { align-items:center; margin:0 auto; }
+.dice-sheet .dice { width:118px; height:118px; border-radius:20px; }
+.dice-prompt { font-size:clamp(18px,5vw,24px); font-weight:900; margin-bottom:10px; }
+.dice-target { margin-top:10px; font-weight:800; background:#fff3c4; border:1px solid #e3c964; border-radius:10px; padding:6px 8px; }
+.dice-target:empty { display:none; }
+.dice-sheet .dice-note { margin-top:8px; }
 </style>
   </head>
   <body>
@@ -807,24 +818,17 @@
             <div class="sea-window-title">プレイヤー</div>
             <div class="status" id="status"></div>
           </div>
-          <div class="sea-window sea-control">
-            <div class="control-top">
-              <div class="dice-wrap">
-                <button type="button" class="dice" id="dice" aria-label="サイコロをふる"><span class="dice-pips" id="dicePips"></span></button>
-                <div class="dice-hint" id="diceHint">タップでふる！</div>
-              </div>
-              <div class="control-head">
-                <div class="control-title" id="centerTitle">目的地をめざそう</div>
-                <div class="control-sub" id="centerSub"></div>
-                <div class="dice-note" id="diceNote">サイコロをタップして進もう</div>
-              </div>
-            </div>
-            <div class="msg" id="msg">ゲーム開始を待っています。</div>
-            <div class="actions" id="actions">
-              <div class="action-wait">「ゲームスタート」を押すと、あなたの番にサイコロが光ります</div>
-            </div>
-            <div class="fact" id="factBox"></div>
           </div>
+        <div class="info-strip">
+          <div class="control-head">
+            <div class="control-title" id="centerTitle">目的地をめざそう</div>
+            <div class="control-sub" id="centerSub"></div>
+          </div>
+          <div class="msg" id="msg">ゲーム開始を待っています。</div>
+          <div class="actions" id="actions">
+            <div class="action-wait">「ゲームスタート」を押すと、あなたの番にサイコロが画面中央に出ます</div>
+          </div>
+          <div class="fact" id="factBox"></div>
         </div>
         <div class="map-legend">道路線＝移動ルート、破線＝橋・フェリーです。★＝県庁所在地。</div>
         <div class="player-colors" id="playerColors"></div>
@@ -868,6 +872,18 @@
       </div>
     </div>
 
+    <!-- dice overlay (center) -->
+    <div class="overlay dice-overlay" id="diceOverlay" hidden>
+      <div class="sheet dice-sheet">
+        <div class="dice-prompt" id="dicePrompt">サイコロをタップしてね</div>
+        <div class="dice-wrap">
+          <button type="button" class="dice" id="dice" aria-label="サイコロをふる"><span class="dice-pips" id="dicePips"></span></button>
+          <div class="dice-hint" id="diceHint">タップでふる！</div>
+        </div>
+        <div class="dice-target" id="diceTarget"></div>
+        <div class="dice-note" id="diceNote">サイコロをタップして進もう</div>
+      </div>
+    </div>
     <!-- center splash -->
     <div class="splash" id="splash" hidden>
       <div class="splash-inner splash-duel">
@@ -1578,7 +1594,15 @@ function humanChoice(buttons) {
 /* the dice itself is the roll button: it lights up on the human turn and
    the turn waits until it is tapped */
 let diceClickResolve = null;
-function waitDiceClick() {
+function showDice(prompt,target){
+ const ov=$("diceOverlay");if(!ov)return;
+ if(prompt!==undefined)$("dicePrompt").textContent=prompt;
+ $("diceTarget").textContent=target||"";
+ ov.hidden=false;
+}
+function hideDice(){ const ov=$("diceOverlay"); if(ov)ov.hidden=true; }
+function waitDiceClick(prompt,target) {
+  showDice(prompt,target);
   return new Promise((resolve) => {
     diceClickResolve = resolve;
     const d = $("dice");
@@ -1809,27 +1833,36 @@ async function resolveArrival(pi){
   let attack,defense;
   if(!pl.cpu){
    await showSplash("⚔️ 対決！",defender.name+" の "+p.name+" を うばえるか？","duel",1100);
-   setMsg("対決！ サイコロをタップして振ってください");
+   showDice("相手の防衛ロール");
+   defense=(await rollDiceAnimated())+1;
+   $("diceNote").textContent=defender.name+" の防衛："+(defense-1)+" ＋防衛1 ＝ 合計 "+defense;
+   await wait(900);
+   const needA=defense+1;
+   const targetA=needA<=6?("あなたは "+needA+" 以上で勝ち！"):("相手は合計 "+defense+"。"+needA+" 以上の目は出ないので今回は奪えないけど、振ってみよう");
+   setMsg("対決！ "+targetA);
    showWait("サイコロをタップして対決！");
-   await waitDiceClick();
+   await waitDiceClick("あなたの攻撃ロール",defender.name+" の防衛は "+(defense-1)+"＋1＝"+defense+"。"+targetA);
    $("actions").innerHTML="";
    attack=await rollDiceAnimated();
-   await wait(350);
-   defense=(1+Math.floor(Math.random()*6))+1;
-   renderDice(defense-1);
    $("diceNote").textContent=pl.name+"："+attack+" ／ "+defender.name+"："+(defense-1)+"＋防衛1";
-   await wait(700);
+   await wait(1300);
+   hideDice();
   }else if(!defender.cpu){
+   showDice("相手の攻撃ロール");
    attack=await rollDiceAnimated();
    $("diceNote").textContent=pl.name+" の攻撃："+attack;
+   await wait(900);
    await showSplash("⚔️ 挑戦された！",pl.name+" が あなたの "+p.name+" に挑戦！","duel",1200);
-   setMsg("防衛の番です。サイコロをタップして振ってください");
+   const needD=attack-1;
+   const targetD=needD<=1?"どの目を出しても守れるよ（同点は防衛の勝ち）":(needD+" 以上の目で守れる！（同点は防衛の勝ち）");
+   setMsg("防衛の番です。"+targetD);
    showWait("サイコロをタップして防衛！");
-   await waitDiceClick();
+   await waitDiceClick("あなたの防衛ロール",pl.name+" の攻撃は "+attack+"。"+targetD);
    $("actions").innerHTML="";
    defense=(await rollDiceAnimated())+1;
    $("diceNote").textContent=pl.name+"："+attack+" ／ "+defender.name+"："+(defense-1)+"＋防衛1";
-   await wait(700);
+   await wait(1300);
+   hideDice();
   }else{
    await wait(450);
    attack=1+Math.floor(Math.random()*6);defense=1+Math.floor(Math.random()*6)+1;
@@ -1860,11 +1893,11 @@ async function resolveArrival(pi){
 }
 async function playTurn(pi){
  const pl=S.players[pi];S.current=pi;renderStatus();centerMapOn(pl.pos);
- if(!pl.cpu){setMsg("あなたの番です。サイコロをタップしてください。");$("diceNote").textContent=pl.name+"の番";showWait("サイコロをタップしてね");await waitDiceClick();$("actions").innerHTML="";}
+ if(!pl.cpu){setMsg("あなたの番です。サイコロをタップしてください。");$("diceNote").textContent=pl.name+"の番";showWait("サイコロをタップしてね");await waitDiceClick("あなたの番！ サイコロをタップ");$("actions").innerHTML="";}
  else{setMsg(pl.name+"（CPU）の番です…");showWait(pl.name+"の番です");await wait(400);}
  const roll=1+Math.floor(Math.random()*6),dice=$("dice");dice.classList.remove("rolling");void dice.offsetWidth;dice.classList.add("rolling");
  for(let i=0;i<5;i++){renderDice(1+Math.floor(Math.random()*6));await wait(65);}renderDice(roll);$("diceNote").textContent=pl.name+"："+roll+" が出た";
- log(pl.name+" は "+roll+" マス進みます");await wait(200);
+ log(pl.name+" は "+roll+" マス進みます");if(!pl.cpu){await wait(1000);hideDice();}else{await wait(200);}
  await movePlayer(pi,roll);
  await resolveArrival(pi);
  renderAll();
