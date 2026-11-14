@@ -786,6 +786,12 @@
 .dice-target { margin-top:10px; font-weight:800; background:#fff3c4; border:1px solid #e3c964; border-radius:10px; padding:6px 8px; }
 .dice-target:empty { display:none; }
 .dice-sheet .dice-note { margin-top:8px; }
+
+/* ===== fork-choice tap reliability (2026-11-14) ===== */
+#japanMap.choosing .map-pin { opacity:.28; }
+#japanMap.choosing .map-pin.choice-target { opacity:1; padding:16px; }
+.map-pin.choice-picked { animation:pickedFlash .8s ease; }
+@keyframes pickedFlash { 0%{ filter:brightness(1);} 30%{ filter:brightness(1.9) drop-shadow(0 0 12px #ffd23f);} 100%{ filter:brightness(1);} }
 </style>
   </head>
   <body>
@@ -1430,7 +1436,7 @@ function buildJapanMap(container,infoEl){
  PREFS.forEach((p,i)=>{if(i===46)return;const path=inst.prefPaths[i];if(!path)return;const box=path.getBBox();const label=document.createElement("span");label.className="pref-name-label";label.textContent=p.short;label.style.left=(box.x+box.width/2)+"%";label.style.top=(box.y+box.height/2)+"%";container.appendChild(label);inst.prefLabels.push(label);});
  PREFS.forEach((p,i)=>{const pos=MAP_POS[i],b=document.createElement("button");b.type="button";b.className="map-pin"+(pos.flip?" flip":"");b.style.setProperty("--rc",REGIONS[p.region].color);
  b.setAttribute("aria-label",p.name+"（県庁所在地："+p.capital+"）");b.innerHTML='<span class="cap-star">★</span><span class="cap-lab">'+p.short+'<span class="cap-name">'+p.capital+'</span></span><span class="pips"></span>';
- b.style.left=pos.x+"%";b.style.top=pos.y+"%";(pos.inset?inset:container).appendChild(b);b.addEventListener("click",()=>handlePinClick(i));inst.pins.push(b);});
+ b.style.left=pos.x+"%";b.style.top=pos.y+"%";(pos.inset?inset:container).appendChild(b);b.addEventListener("pointerdown",()=>handlePinClick(i));b.addEventListener("click",()=>handlePinClick(i));inst.pins.push(b);});
  inst.infoEl=infoEl;mapInstances.push(inst);return inst;
 }
 
@@ -1553,7 +1559,7 @@ function chooseDestination(fromPos) {
 
 /* ===== map centering & on-map fork choice (2026-11-14) ===== */
 let mapChoice = null;
-function centerMapOn(prefIdx){
+function centerMapOn(prefIdx,smooth){
  try{
   const inst=mapInstances[0];if(!inst||!inst.pins[prefIdx])return;
   const pin=inst.pins[prefIdx];
@@ -1562,7 +1568,7 @@ function centerMapOn(prefIdx){
   if(!scroller||!mapEl)return;
   const pr=pin.getBoundingClientRect(),mr=mapEl.getBoundingClientRect();
   const cx=pr.left-mr.left+pr.width/2, cy=pr.top-mr.top+pr.height/2;
-  scroller.scrollTo({left:Math.max(0,cx-scroller.clientWidth/2),top:Math.max(0,cy-scroller.clientHeight/2),behavior:"smooth"});
+  scroller.scrollTo({left:Math.max(0,cx-scroller.clientWidth/2),top:Math.max(0,cy-scroller.clientHeight/2),behavior:(smooth===false?"auto":"smooth")});
  }catch(e){/* centering is cosmetic: never break the game */}
 }
 function markChoicePins(choices){
@@ -1573,14 +1579,18 @@ function clearChoicePins(){
 }
 function handlePinClick(i){
  if(mapChoice&&mapChoice.targets.has(i)){
-  const r=mapChoice.resolve;mapChoice=null;clearChoicePins();selectPrefOnMap(i);r(i);return;
+  const r=mapChoice.resolve;mapChoice=null;clearChoicePins();
+  const inst=mapInstances[0];const pin=inst&&inst.pins[i];
+  if(pin){pin.classList.add("choice-picked");setTimeout(()=>pin.classList.remove("choice-picked"),800);}
+  selectPrefOnMap(i);r(i);return;
  }
  selectPrefOnMap(i);
 }
 function waitForkChoice(choices){
  return new Promise(resolve=>{
   let done=false;
-  const finish=(idx)=>{if(done)return;done=true;mapChoice=null;clearChoicePins();$("actions").innerHTML="";resolve(idx);};
+  const mapEl=$("japanMap");if(mapEl)mapEl.classList.add("choosing");
+  const finish=(idx)=>{if(done)return;done=true;mapChoice=null;if(mapEl)mapEl.classList.remove("choosing");clearChoicePins();$("actions").innerHTML="";resolve(idx);};
   mapChoice={targets:new Set(choices.map(o=>o.to)),resolve:(prefIdx)=>{const idx=choices.findIndex(o=>o.to===prefIdx);if(idx>=0)finish(idx);}};
   markChoicePins(choices);
   setActions(choices.map((o,i)=>({label:PREFS[o.to].name+(o.edge.type==="road"?"":"（"+o.edge.label+"）"),onClick:()=>finish(i)})));
@@ -1633,7 +1643,7 @@ async function movePlayer(pi,steps){
   const choices=forward.length?forward:opts;
   let chosen=choices[0];
   if(choices.length>1&&!pl.cpu){
-   centerMapOn(pl.pos);
+   centerMapOn(pl.pos,false);
    setMsg(pl.name+" の分かれ道です。光っている行き先の県を地図でタップするか、下のボタンで選んでください（残り "+(steps-step+1)+" マス）");
    const pick=await waitForkChoice(choices);
    chosen=choices[pick];
