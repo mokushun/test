@@ -758,10 +758,23 @@
 .tcard-pop { max-width:230px; margin:0 auto; }
 
 /* ===== map: choice targets & centering (2026-11-14) ===== */
-.map-pin.choice-target { z-index:30; }
-.map-pin.choice-target .cap-star { color:#ffb400; text-shadow:0 0 6px #ffb400,0 0 2px #fff; animation:choicePulse .8s ease-in-out infinite alternate; }
-.map-pin.choice-target .cap-lab { background:#fff3c4; border-color:#ffb400; font-weight:800; }
-@keyframes choicePulse { from { transform:scale(1); } to { transform:scale(1.45); } }
+.map-pin.choice-target { z-index:40; }
+.map-pin.choice-target::after { content:""; position:absolute; left:10px; top:50%; width:46px; height:46px; transform:translate(-50%,-50%); border:4px solid #ff2255; border-radius:50%; pointer-events:none; animation:choiceRing .9s ease-out infinite; }
+.map-pin.choice-target .cap-star { color:#ff2255; font-size:30px; text-shadow:0 0 4px #fff,0 0 4px #fff,0 0 10px #ff2255; animation:choicePulse .7s ease-in-out infinite alternate; }
+.map-pin.choice-target .cap-lab { background:#ff2255; color:#fff; border:2px solid #fff; font-weight:800; font-size:15px; box-shadow:0 2px 8px rgba(255,34,85,.55); }
+@keyframes choicePulse { from { transform:scale(1); } to { transform:scale(1.35); } }
+@keyframes choiceRing { 0% { transform:translate(-50%,-50%) scale(.55); opacity:1; } 100% { transform:translate(-50%,-50%) scale(1.3); opacity:.15; } }
+/* ===== center splash (duel win/lose presentation) ===== */
+.splash { position:fixed; inset:0; z-index:80; display:flex; align-items:center; justify-content:center; pointer-events:none; padding:16px; }
+.splash[hidden] { display:none; }
+.splash-inner { text-align:center; color:#fff; border-radius:22px; padding:26px 34px; box-shadow:0 12px 40px rgba(0,0,0,.35); border:3px solid rgba(255,255,255,.85); max-width:92vw; }
+.splash-duel { background:linear-gradient(150deg,#5b5bd6,#8e6cc8); }
+.splash-win { background:linear-gradient(150deg,#1d9e57,#57b83e); }
+.splash-lose { background:linear-gradient(150deg,#8a8f98,#c0392b); }
+.splash-title { font-size:clamp(30px,8vw,52px); font-weight:900; letter-spacing:.02em; text-shadow:0 2px 0 rgba(0,0,0,.18); }
+.splash-sub { font-size:clamp(14px,3.6vw,19px); font-weight:700; margin-top:6px; }
+.splash-anim { animation:splashPop .45s ease-out; }
+@keyframes splashPop { 0% { transform:scale(.55); opacity:0; } 60% { transform:scale(1.07); opacity:1; } 100% { transform:scale(1); opacity:1; } }
 </style>
   </head>
   <body>
@@ -855,6 +868,13 @@
       </div>
     </div>
 
+    <!-- center splash -->
+    <div class="splash" id="splash" hidden>
+      <div class="splash-inner splash-duel">
+        <div class="splash-title" id="splashTitle"></div>
+        <div class="splash-sub" id="splashSub"></div>
+      </div>
+    </div>
     <!-- card get overlay -->
     <div class="overlay" id="cardOverlay" hidden>
       <div class="sheet card-sheet">
@@ -1253,6 +1273,24 @@ function buildTradingCard(k){
  root.appendChild(inner);
  root.addEventListener("click",()=>{root.classList.toggle("flipped");});
  return root;
+}
+function showSplash(title,sub,kind,ms){
+ return new Promise(res=>{
+  const sp=$("splash");if(!sp){res();return;}
+  $("splashTitle").textContent=title;
+  $("splashSub").textContent=sub||"";
+  const inner=sp.querySelector(".splash-inner");
+  inner.className="splash-inner splash-"+(kind||"duel");
+  sp.hidden=false;
+  inner.classList.remove("splash-anim");void inner.offsetWidth;inner.classList.add("splash-anim");
+  setTimeout(()=>{sp.hidden=true;res();},ms||1600);
+ });
+}
+async function rollDiceAnimated(){
+ const dice=$("dice");let v=1;
+ if(dice){dice.classList.remove("rolling");void dice.offsetWidth;dice.classList.add("rolling");}
+ for(let i=0;i<5;i++){v=1+Math.floor(Math.random()*6);renderDice(v);await wait(65);}
+ return v;
 }
 function showCardPopup(k,title){
  return new Promise(res=>{
@@ -1768,11 +1806,37 @@ async function resolveArrival(pi){
  }else{
   const defender=S.players[owner];
   setMsg(pl.name+" が "+p.name+" に到着！所有者 "+defender.name+" と対決！");
-  await wait(450);
-  const attack=1+Math.floor(Math.random()*6),defense=1+Math.floor(Math.random()*6)+1;
-  renderDice(attack);$("diceNote").textContent=pl.name+"："+attack+" ／ "+defender.name+"："+(defense-1)+"＋防衛1";
+  let attack,defense;
+  if(!pl.cpu){
+   await showSplash("⚔️ 対決！",defender.name+" の "+p.name+" を うばえるか？","duel",1100);
+   setMsg("対決！ サイコロをタップして振ってください");
+   showWait("サイコロをタップして対決！");
+   await waitDiceClick();
+   $("actions").innerHTML="";
+   attack=await rollDiceAnimated();
+   await wait(350);
+   defense=(1+Math.floor(Math.random()*6))+1;
+   renderDice(defense-1);
+   $("diceNote").textContent=pl.name+"："+attack+" ／ "+defender.name+"："+(defense-1)+"＋防衛1";
+   await wait(700);
+  }else if(!defender.cpu){
+   attack=await rollDiceAnimated();
+   $("diceNote").textContent=pl.name+" の攻撃："+attack;
+   await showSplash("⚔️ 挑戦された！",pl.name+" が あなたの "+p.name+" に挑戦！","duel",1200);
+   setMsg("防衛の番です。サイコロをタップして振ってください");
+   showWait("サイコロをタップして防衛！");
+   await waitDiceClick();
+   $("actions").innerHTML="";
+   defense=(await rollDiceAnimated())+1;
+   $("diceNote").textContent=pl.name+"："+attack+" ／ "+defender.name+"："+(defense-1)+"＋防衛1";
+   await wait(700);
+  }else{
+   await wait(450);
+   attack=1+Math.floor(Math.random()*6);defense=1+Math.floor(Math.random()*6)+1;
+   renderDice(attack);$("diceNote").textContent=pl.name+"："+attack+" ／ "+defender.name+"："+(defense-1)+"＋防衛1";
+   await wait(500);
+  }
   const won=attack>defense;
-  await wait(500);
   if(won){
    S.owners[idx]=pi;pl.cards++;defender.cards--;gainTitle=p.name+"カードを うばった！";
    setMsg(pl.name+" の勝ち！ "+p.name+" とカードを奪いました。（"+attack+" 対 "+defense+"）");
@@ -1780,6 +1844,14 @@ async function resolveArrival(pi){
   }else{
    setMsg(defender.name+" が防衛成功！ "+p.name+" はそのまま。（挑戦 "+attack+" 対 防衛 "+defense+"）");
    log(defender.name+" が "+p.name+" を防衛");
+  }
+  if(!pl.cpu||!defender.cpu){
+   let sTitle,sSub,sKind;
+   if(!pl.cpu&&won){sTitle="🎉 勝った！";sSub=p.name+" を うばった！";sKind="win";}
+   else if(!pl.cpu&&!won){sTitle="💦 防衛された…";sSub=defender.name+" が "+p.name+" を守りきった";sKind="lose";}
+   else if(won){sTitle="😱 うばわれた…";sSub=p.name+" を "+pl.name+" に取られた";sKind="lose";}
+   else{sTitle="🛡️ 防衛成功！";sSub=p.name+" を守った！";sKind="win";}
+   await showSplash(sTitle,sSub+"（"+attack+" 対 "+defense+"）",sKind,2000);
   }
  }
  renderAll();
