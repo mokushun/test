@@ -734,6 +734,28 @@
 .cq-btn.wrong { background:#d23b2e; color:#fff; border-color:#d23b2e; }
 .cq-exp { margin-top:4px; color:#2e6b34; }
 .map-card { margin-top:6px; padding-top:6px; border-top:1px dashed #c9b98a; }
+
+/* ===== trading-card style (2026-11-14) ===== */
+#myProps.tcard-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(168px,1fr)); gap:12px; padding-left:0; }
+.tcard { list-style:none; perspective:900px; }
+.tcard-inner { position:relative; width:100%; aspect-ratio:5/7; transform-style:preserve-3d; transition:transform .55s; }
+.tcard.flipped .tcard-inner { transform:rotateY(180deg); }
+.tcard-face { position:absolute; inset:0; backface-visibility:hidden; -webkit-backface-visibility:hidden; border:3px solid #999; border-radius:14px; background:#fffdf6; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 3px 8px rgba(0,0,0,.18); cursor:pointer; }
+.tcard-back { transform:rotateY(180deg); }
+.tc-head { color:#fff; font-weight:800; padding:6px 10px; display:flex; justify-content:space-between; align-items:center; font-size:15px; }
+.tc-no { font-size:11px; opacity:.9; }
+.tc-art { text-align:center; padding:8px 0 2px; }
+.tc-emoji { font-size:52px; line-height:1.1; }
+.tc-title { text-align:center; font-weight:800; font-size:14px; padding:2px 8px; }
+.tc-rows { font-size:12px; padding:4px 10px; line-height:1.55; }
+.tc-badge { background:#fff0c2; border:1px solid #e3c964; border-radius:999px; padding:0 7px; font-weight:700; }
+.tc-fact { font-size:11.5px; padding:4px 10px; line-height:1.5; flex:1; overflow:auto; }
+.tc-foot { text-align:center; font-size:11px; color:#8a6d2f; padding:5px; border-top:1px dashed #d8c690; }
+.tc-q { font-weight:800; font-size:13.5px; padding:10px 10px 2px; line-height:1.5; }
+.tc-choices { padding:2px 10px; display:flex; flex-direction:column; align-items:flex-start; }
+.tc-choices .cq-btn { margin-top:5px; }
+.card-sheet { max-width:300px; margin:0 auto; }
+.tcard-pop { max-width:230px; margin:0 auto; }
 </style>
   </head>
   <body>
@@ -827,6 +849,16 @@
       </div>
     </div>
 
+    <!-- card get overlay -->
+    <div class="overlay" id="cardOverlay" hidden>
+      <div class="sheet card-sheet">
+        <h2 id="cardPopTitle">カードをゲット！</h2>
+        <div id="cardPopBody"></div>
+        <div class="actions" style="margin-top:14px;">
+          <button type="button" class="primary" id="cardPopBtn">つづける</button>
+        </div>
+      </div>
+    </div>
     <!-- result overlay -->
     <div class="overlay" id="resultOverlay" hidden>
       <div class="sheet">
@@ -1183,35 +1215,63 @@ function renderStatus(){
  const n=Object.keys(S.owners).length;$("exploreCount").textContent=n+" / 47 県";$("exploreBar").style.width=(n/47*100)+"%";
 }
 
+function buildTradingCard(k){
+ const p=PREFS[k],cd=cardOf(k),rg=REGIONS[p.region],no="No."+String(k+1).padStart(2,"0");
+ const root=document.createElement("li");root.className="tcard";
+ const inner=document.createElement("div");inner.className="tcard-inner";
+ const front=document.createElement("div");front.className="tcard-face tcard-front";front.style.borderColor=rg.color;
+ front.innerHTML='<div class="tc-head" style="background:'+rg.color+'"><span>'+p.name+'</span><span class="tc-no">'+no+'</span></div>'
+  +'<div class="tc-art" style="background:linear-gradient(160deg,'+rg.color+'2e,#fff7e6)"><span class="tc-emoji">'+cd.emoji+'</span></div>'
+  +'<div class="tc-title">「'+cd.title+'」</div>'
+  +'<div class="tc-rows"><div>県庁所在地：'+p.capital+'</div><div>特産品：<span class="tc-badge">'+cd.specialty+'</span></div></div>'
+  +'<div class="tc-fact">'+cd.fact+'</div>'
+  +'<div class="tc-foot">タップで うら面のクイズへ</div>';
+ const back=document.createElement("div");back.className="tcard-face tcard-back";back.style.borderColor=rg.color;
+ const bHead=document.createElement("div");bHead.className="tc-head";bHead.style.background=rg.color;
+ bHead.innerHTML='<span>'+p.name+' クイズ</span><span class="tc-no">'+no+'</span>';
+ const bQ=document.createElement("div");bQ.className="tc-q";bQ.textContent=cd.question;
+ const bChoices=document.createElement("div");bChoices.className="tc-choices";
+ const bExp=document.createElement("div");bExp.className="cq-exp";bExp.style.padding="4px 10px";
+ cd.choices.forEach(ch=>{
+  const b=document.createElement("button");b.type="button";b.className="cq-btn";b.textContent=ch;
+  b.addEventListener("click",(ev)=>{
+   ev.stopPropagation();
+   bChoices.querySelectorAll("button").forEach(x=>{x.disabled=true;if(x.textContent===cd.answer)x.classList.add("correct");else if(x===b)x.classList.add("wrong");});
+   bExp.textContent=(ch===cd.answer?"正解！ ":"ざんねん、正解は「"+cd.answer+"」。 ")+cd.explanation;
+  });
+  bChoices.appendChild(b);
+ });
+ const bFoot=document.createElement("div");bFoot.className="tc-foot";bFoot.textContent="タップで おもて面へ";
+ back.appendChild(bHead);back.appendChild(bQ);back.appendChild(bChoices);back.appendChild(bExp);back.appendChild(bFoot);
+ inner.appendChild(front);inner.appendChild(back);
+ root.appendChild(inner);
+ root.addEventListener("click",()=>{root.classList.toggle("flipped");});
+ return root;
+}
+function showCardPopup(k,title){
+ return new Promise(res=>{
+  if(!cardOf(k)){res();return;}
+  $("cardPopTitle").textContent=title;
+  const body=$("cardPopBody");body.innerHTML="";
+  const card=buildTradingCard(k);card.classList.add("tcard-pop");
+  body.appendChild(card);
+  $("cardOverlay").hidden=false;
+  let done=false;
+  const finish=()=>{if(done)return;done=true;$("cardOverlay").hidden=true;res();};
+  $("cardPopBtn").onclick=finish;
+  setTimeout(finish,4500);
+ });
+}
 function renderMyProps(){
  const ul=$("myProps");ul.innerHTML="";
  const hi=humanIndex();
  const keys=Object.keys(S.owners).filter(k=>S.owners[k]===hi).map(Number).sort((a,b)=>a-b);
- if(!keys.length){ul.innerHTML='<li class="empty-note">まだカードを持っていません。</li>';return;}
+ if(!keys.length){ul.classList.remove("tcard-grid");ul.innerHTML='<li class="empty-note">まだカードを持っていません。</li>';return;}
+ ul.classList.toggle("tcard-grid", keys.some(k=>cardOf(k)));
  keys.forEach(k=>{
-  const p=PREFS[k],cd=cardOf(k),li=document.createElement("li");
-  if(!cd){li.textContent=p.name+"｜"+p.specialty+"｜"+p.fact;ul.appendChild(li);return;}
-  li.className="pcard";
-  const head=document.createElement("div");head.className="pcard-head";
-  head.textContent=cd.emoji+" "+p.name+"「"+cd.title+"」";
-  const spec=document.createElement("div");spec.className="pcard-spec";spec.textContent="特産品："+cd.specialty;
-  const fact=document.createElement("div");fact.className="pcard-fact";fact.textContent=cd.fact;
-  li.appendChild(head);li.appendChild(spec);li.appendChild(fact);
-  const quiz=document.createElement("div");quiz.className="pcard-quiz";
-  const q=document.createElement("div");q.className="pcard-quiz-q";q.textContent="クイズ："+cd.question;
-  quiz.appendChild(q);
-  const exp=document.createElement("div");exp.className="cq-exp";
-  cd.choices.forEach(ch=>{
-   const b=document.createElement("button");b.type="button";b.className="cq-btn";b.textContent=ch;
-   b.addEventListener("click",()=>{
-    quiz.querySelectorAll("button").forEach(x=>{x.disabled=true;if(x.textContent===cd.answer)x.classList.add("correct");else if(x===b)x.classList.add("wrong");});
-    exp.textContent=(ch===cd.answer?"正解！ ":"ざんねん、正解は「"+cd.answer+"」。 ")+cd.explanation;
-   });
-   quiz.appendChild(b);
-  });
-  quiz.appendChild(exp);
-  li.appendChild(quiz);
-  ul.appendChild(li);
+  if(cardOf(k)){ul.appendChild(buildTradingCard(k));return;}
+  const p=PREFS[k],li=document.createElement("li");
+  li.textContent=p.name+"｜"+p.specialty+"｜"+p.fact;ul.appendChild(li);
  });
 }
 
@@ -1651,10 +1711,11 @@ async function resolveTile(pi) {
 async function resolveArrival(pi){
  const pl=S.players[pi],idx=pl.pos,p=PREFS[idx],owner=S.owners[idx];
  const cd=cardOf(idx);
+ let gainTitle="";
   if(cd){$("factBox").innerHTML="<b>"+cd.emoji+" "+p.name+"カード「"+cd.title+"」</b><br>"+cd.fact+"<br>特産品："+cd.specialty;}
   else{$("factBox").innerHTML="<b>"+p.name+"：</b>"+p.fact+"<br>特産品："+p.specialty;}
  if(owner===undefined){
-  S.owners[idx]=pi;pl.cards++;
+  S.owners[idx]=pi;pl.cards++;gainTitle=p.name+"カードを ゲット！";
   setMsg(pl.name+" が "+p.name+" を獲得！「"+p.specialty+"」カードを手に入れました。");
   log(pl.name+" が "+p.name+" を新たに獲得");
  }else if(owner===pi){
@@ -1669,7 +1730,7 @@ async function resolveArrival(pi){
   const won=attack>defense;
   await wait(500);
   if(won){
-   S.owners[idx]=pi;pl.cards++;defender.cards--;
+   S.owners[idx]=pi;pl.cards++;defender.cards--;gainTitle=p.name+"カードを うばった！";
    setMsg(pl.name+" の勝ち！ "+p.name+" とカードを奪いました。（"+attack+" 対 "+defense+"）");
    log(pl.name+" が "+defender.name+" から "+p.name+" を奪取");
   }else{
@@ -1678,6 +1739,7 @@ async function resolveArrival(pi){
   }
  }
  renderAll();
+ if(gainTitle&&!pl.cpu)await showCardPopup(idx,gainTitle);
  await wait(pl.cpu?350:650);
 }
 async function playTurn(pi){
