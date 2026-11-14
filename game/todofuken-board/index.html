@@ -776,6 +776,16 @@
 
 /* ===== name labels must not eat pin taps (2026-11-14) ===== */
 .pref-name-label, .sea-label, .north-arrow, .inset-label { pointer-events:none; }
+
+/* ===== 3D dice (2026-11-14) ===== */
+.dice { --dz:30px; perspective:700px; background:none; border:none; box-shadow:none; display:block; }
+.dice-sheet .dice { --dz:59px; }
+.dice-cube { position:relative; display:block; width:100%; height:100%; transform-style:preserve-3d; transition:transform 1s cubic-bezier(.25,.8,.3,1); }
+.dice-face { position:absolute; inset:0; display:grid; grid-template-columns:repeat(3,1fr); grid-template-rows:repeat(3,1fr); padding:15%; background:linear-gradient(145deg,#ffffff,#f6ecd9); border:3px solid #263653; border-radius:15px; backface-visibility:hidden; }
+.fdot { width:76%; aspect-ratio:1/1; border-radius:50%; background:#263653; place-self:center; }
+.fdot.red { background:#d23b2e; width:92%; }
+.dice.clickable .dice-cube { animation:cubeWiggle 1.15s ease-in-out infinite; }
+@keyframes cubeWiggle { 0%,100%{ margin-top:0; } 50%{ margin-top:-5px; } }
 </style>
   </head>
   <body>
@@ -856,7 +866,7 @@
       <div class="sheet dice-sheet">
         <div class="dice-prompt" id="dicePrompt">サイコロをタップしてね</div>
         <div class="dice-wrap">
-          <button type="button" class="dice" id="dice" aria-label="サイコロをふる"><span class="dice-pips" id="dicePips"></span></button>
+          <button type="button" class="dice" id="dice" aria-label="サイコロをふる"><span class="dice-cube" id="diceCube"></span></button>
           <div class="dice-hint" id="diceHint">タップでふる！</div>
         </div>
         <div class="dice-target" id="diceTarget"></div>
@@ -1014,7 +1024,7 @@ const MAP_POS = [
 /* Verified adjacency graph; special sea/bridge links are explicitly marked. */
 const ROAD_EDGES=[
 /* 北海道・東北 */
-[0,1,"road","青函トンネル"],[1,2],[1,4],[2,3],[2,4],[3,4],[3,5],[3,6],[4,5],[5,6],[5,14],[6,7],[6,8],[6,14],[6,9],
+[0,1,"road","青函フェリー"],[1,2],[1,4],[2,3],[2,4],[3,4],[3,5],[3,6],[4,5],[5,6],[5,14],[6,7],[6,8],[6,14],[6,9],
 /* 関東・甲信越 */
 [7,8],[7,10],[7,11],[8,9],[8,10],[9,10],[9,14],[9,19],[10,11],[10,12],[10,18],[10,19],
 [11,12],[11,13,"bridge","東京湾アクアライン"],[12,13],[12,18],[13,18],[13,21],[14,15],[14,19],[15,16],[15,19],[15,20],[16,17],[16,20],[17,20],[17,24],[17,25],
@@ -1042,17 +1052,45 @@ function drawRoads(container){
 }
 /* dice pips drawn with CSS dots (no reliance on dice glyph fonts) */
 const PIP_MAP = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
-function renderDice(n) {
-  const box = document.getElementById("dicePips");
-  if (!box) return;
-  box.innerHTML = "";
-  const on = PIP_MAP[n] || [4];
-  for (let i = 0; i < 9; i++) {
-    const s = document.createElement("span");
-    s.className = "pip" + (on.indexOf(i) >= 0 ? " on" : "") + (n === 1 && i === 4 ? " one" : "");
-    box.appendChild(s);
-  }
+const DICE_FACE_ROT = { 1: [0, 0], 2: [0, -90], 3: [-90, 0], 4: [90, 0], 5: [0, 90], 6: [0, 180] };
+const DICE_FACE_TF = { 1: "rotateY(0deg)", 2: "rotateY(90deg)", 3: "rotateX(90deg)", 4: "rotateX(-90deg)", 5: "rotateY(-90deg)", 6: "rotateY(180deg)" };
+let diceRot = { x: 0, y: 0 };
+function buildDiceCube() {
+  const cube = $("diceCube");
+  if (!cube || cube.children.length) return;
+  [1, 2, 3, 4, 5, 6].forEach((v) => {
+    const f = document.createElement("span");
+    f.className = "dice-face";
+    f.style.transform = DICE_FACE_TF[v] + " translateZ(var(--dz, 30px))";
+    for (let c = 0; c < 9; c++) {
+      const d = document.createElement("span");
+      if ((PIP_MAP[v] || []).indexOf(c) >= 0) d.className = "fdot" + (v === 1 ? " red" : "");
+      f.appendChild(d);
+    }
+    cube.appendChild(f);
+  });
 }
+function nextAngle(cur, base) {
+  let a = base + 360 * Math.round((cur - base) / 360);
+  while (a < cur) a += 360;
+  while (a - 360 >= cur) a -= 360;
+  return a;
+}
+function setDiceFace(n, spin) {
+  buildDiceCube();
+  const cube = $("diceCube");
+  if (!cube) return;
+  const base = DICE_FACE_ROT[n] || [0, 0];
+  if (spin) {
+    diceRot = { x: nextAngle(diceRot.x, base[0]) + 720, y: nextAngle(diceRot.y, base[1]) + 360 };
+  } else {
+    cube.style.transition = "none";
+    diceRot = { x: base[0], y: base[1] };
+  }
+  cube.style.transform = "rotateX(" + diceRot.x + "deg) rotateY(" + diceRot.y + "deg)";
+  if (!spin) { void cube.offsetWidth; cube.style.transition = ""; }
+}
+function renderDice(n) { setDiceFace(n, false); }
 
 
 /* ================= state ================= */
@@ -1165,9 +1203,9 @@ function showSplash(title,sub,kind,ms){
  });
 }
 async function rollDiceAnimated(){
- const dice=$("dice");let v=1;
- if(dice){dice.classList.remove("rolling");void dice.offsetWidth;dice.classList.add("rolling");}
- for(let i=0;i<5;i++){v=1+Math.floor(Math.random()*6);renderDice(v);await wait(65);}
+ const v=1+Math.floor(Math.random()*6);
+ setDiceFace(v,true);
+ await wait(1050);
  return v;
 }
 function showCardPopup(k,title){
@@ -1528,8 +1566,7 @@ async function playTurn(pi){
  const pl=S.players[pi];S.current=pi;renderStatus();centerMapOn(pl.pos);
  if(!pl.cpu){setMsg("あなたの番です。サイコロをタップしてください。");$("diceNote").textContent=pl.name+"の番";showWait("サイコロをタップしてね");await waitDiceClick("あなたの番！ サイコロをタップ");$("actions").innerHTML="";}
  else{setMsg(pl.name+"（CPU）の番です…");showWait(pl.name+"の番です");showDice(pl.name+" の番");await wait(400);}
- const roll=1+Math.floor(Math.random()*6),dice=$("dice");dice.classList.remove("rolling");void dice.offsetWidth;dice.classList.add("rolling");
- for(let i=0;i<5;i++){renderDice(1+Math.floor(Math.random()*6));await wait(65);}renderDice(roll);$("diceNote").textContent=pl.name+"："+roll+" が出た";
+ const roll=await rollDiceAnimated();$("diceNote").textContent=pl.name+"："+roll+" が出た";
  log(pl.name+" は "+roll+" マス進みます");if(!pl.cpu){await wait(1000);hideDice();}else{await wait(800);hideDice();}
  await movePlayer(pi,roll);
  await resolveArrival(pi);
