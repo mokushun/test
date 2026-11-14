@@ -1107,7 +1107,6 @@ function buildBoard() {
 }
 function renderTokens(hopPlayer) {
   if (!tileEls.length) {
-    /* no loop board anymore: player pieces live on the japan map pins */
     renderMaps();
     if (hopPlayer >= 0) {
       document.querySelectorAll('.pip-player[data-player="' + hopPlayer + '"]').forEach((el) => el.classList.add("hop"));
@@ -1118,7 +1117,8 @@ function renderTokens(hopPlayer) {
     const box = tileEls[i].querySelector(".tokens");
     box.innerHTML = "";
     S.players.forEach((pl, pi) => {
-      if (pl.pos === i) {
+      // PREFS は0始まり、旧ボードの北海道タイルは1番目。
+      if (pl.pos + 1 === i) {
         const t = document.createElement("div");
         t.className = "token" + (pi === hopPlayer ? " hop" : "");
         t.style.background = pl.color;
@@ -1130,19 +1130,20 @@ function renderTokens(hopPlayer) {
 }
 function renderTiles() {
   if (!tileEls.length) return;
-  for (let i = 1; i < BOARD_LEN; i++) {
-    const el = tileEls[i];
-    const o = S.owners[i];
-    el.classList.toggle("dest", i === S.dest);
+  for (let tileIndex = 1; tileIndex < BOARD_LEN; tileIndex++) {
+    const el = tileEls[tileIndex];
+    const prefIndex = tileIndex - 1;
+    const owner = S.owners[prefIndex];
     const priceEl = el.querySelector(".tprice");
     const starEl = el.querySelector(".tstars");
-    if (o) {
-      priceEl.textContent = S.players[o.player].name;
-      priceEl.style.color = S.players[o.player].color;
+    el.classList.remove("dest");
+    if (owner !== undefined) {
+      priceEl.textContent = S.players[owner].name + "の所有";
+      priceEl.style.color = S.players[owner].color;
       priceEl.style.fontWeight = "800";
-      starEl.textContent = "★".repeat(o.level);
+      starEl.textContent = "★";
     } else {
-      priceEl.textContent = prefOf(i).price + "万";
+      priceEl.textContent = PREFS[prefIndex].specialty;
       priceEl.style.color = "";
       priceEl.style.fontWeight = "";
       starEl.textContent = "";
@@ -1414,15 +1415,27 @@ function handleDiceClick() {
 
 async function movePlayer(pi,steps){
  const pl=S.players[pi];
- for(let n=0;n<steps;n++){
-  const opts=ROAD_GRAPH[pl.pos];if(!opts.length)throw Error(PREFS[pl.pos].name+"から接続道路がありません");
-  let chosen=opts[0];
-  if(opts.length>1&&!pl.cpu){const pick=await humanChoice(opts.map(o=>({label:PREFS[o.to].name+(o.edge.type==="road"?"":"（"+o.edge.label+"）")})));chosen=opts[pick];}
-  else if(pl.cpu)chosen=opts[Math.floor(Math.random()*opts.length)];
+ let previous=-1;
+ for(let step=1;step<=steps;step++){
+  const opts=ROAD_GRAPH[pl.pos];
+  if(!opts.length)throw Error(PREFS[pl.pos].name+"から接続道路がありません");
+  // 分岐では前の県へ戻る選択を避ける。ただし行き止まりなら戻る。
+  const forward=opts.filter(o=>o.to!==previous);
+  const choices=forward.length?forward:opts;
+  let chosen=choices[0];
+  if(choices.length>1&&!pl.cpu){
+   const pick=await humanChoice(choices.map(o=>({label:PREFS[o.to].name+(o.edge.type==="road"?"":"（"+o.edge.label+"）")})));
+   chosen=choices[pick];
+  }else if(pl.cpu){
+   chosen=choices[Math.floor(Math.random()*choices.length)];
+  }
+  previous=pl.pos;
   pl.pos=chosen.to;
   renderTokens(pi);renderStatus();renderMaps();
-  setMsg(pl.name+" は "+PREFS[pl.pos].name+" を通過中…");
-  await wait(pl.cpu?100:140);
+  const remaining=steps-step;
+  setMsg(pl.name+" は "+PREFS[pl.pos].name+(remaining>0?" を通過中（残り "+remaining+" マス）":" に到着") );
+  $("diceNote").textContent=pl.name+"："+step+"/"+steps+" マス目";
+  await wait(pl.cpu?180:240);
  }
  pl.visited[pl.pos]=true;
  return pl.pos;
