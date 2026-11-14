@@ -311,8 +311,10 @@
         border-radius: 10px;
         overflow: hidden;
       }
-      .japan-map.large { max-width: 680px; aspect-ratio: 1 / 1; }
+      .japan-map.large { width: 2040px; height: 2040px; max-width: none; aspect-ratio: auto; margin: 0; }
       #mapOverlay .sheet { max-width: 740px; }
+      .map-scroll { width: 100%; max-height: 62dvh; overflow: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; border: 1px solid var(--line); border-radius: 10px; background: var(--sea); touch-action: pan-x pan-y; }
+      .map-scroll .japan-map.large { border: 0; border-radius: 0; }
       .road-overlay{position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none;overflow:visible}.road{stroke:#fff;stroke-width:.72;opacity:.9}.road.bridge{stroke:#d58b28;stroke-width:1.05;stroke-dasharray:2.2 1.5}.road.ferry{stroke:#2786b8;stroke-width:1.15;stroke-dasharray:1.2 2.2}
       .prefmap {
         position: absolute; inset: 0; width: 100%; height: 100%;
@@ -329,6 +331,9 @@
         position: absolute; color: var(--sea-ink); font-weight: 700; z-index: 1;
         font-size: clamp(8px, 2.2vw, 12px); letter-spacing: 0.35em; pointer-events: none;
       }
+      .japan-map.large .sea-label { font-size: 30px; letter-spacing: 0.35em; }
+      .japan-map.large .north-arrow { font-size: 28px; top: 12px; left: 16px; }
+      .japan-map.large .okinawa-inset .inset-label { font-size: 22px; top: 4px; left: 10px; }
       .sea-label.pacific { right: 4%; bottom: 16%; writing-mode: vertical-rl; }
       .sea-label.japansea { left: 13%; top: 30%; writing-mode: vertical-rl; }
       .north-arrow {
@@ -357,7 +362,7 @@
         color: #f5a623;
         text-shadow: 0 0 2px #fff, 0 0 2px #fff, 1px 0 1px rgba(60,40,0,0.55), -1px 0 1px rgba(60,40,0,0.55), 0 1px 1px rgba(60,40,0,0.55), 0 -1px 1px rgba(60,40,0,0.55);
       }
-      .japan-map.large .cap-star { font-size: clamp(12px, 3.2vw, 18px); }
+      .japan-map.large .cap-star { font-size: 48px; }
       .map-pin .cap-lab {
         background: var(--map-chip); color: var(--ink);
         border: 1.5px solid var(--rc, var(--accent));
@@ -369,7 +374,8 @@
         display: none; font-weight: 600; color: var(--ink-soft); font-size: 0.88em; line-height: 1.2;
       }
       .japan-map.large .cap-lab .cap-name { display: block; }
-      .japan-map.large .cap-lab { font-size: clamp(8px, 2.4vw, 12px); line-height: 1.3; padding: 1px 4px; }
+      .japan-map.large .cap-lab { font-size: 30px; line-height: 1.3; padding: 4px 10px; border-width: 3px; border-radius: 10px; }
+      .japan-map.large .map-pin { gap: 6px; }
       .map-pin.owned .cap-lab { background: var(--pc, var(--rc)); color: #fff; border-color: var(--pc, var(--rc)); }
       .map-pin.owned .cap-lab .cap-name { color: rgba(255,255,255,0.9); }
       .player-colors { display: flex; flex-wrap: wrap; gap: 6px; margin: 5px 0 2px; align-items: center; }
@@ -395,6 +401,7 @@
         display: flex; align-items: center; justify-content: center;
         color: #fff; font-weight: 800; font-size: clamp(5px, 1.5vw, 8px);
       }
+      .japan-map.large .map-pin .pip-player { width: 30px; height: 30px; font-size: 20px; border-width: 3px; }
       .map-pin.flip .pips { margin-left: 0; margin-right: 1px; }
       .map-info {
         margin-top: 5px; font-size: clamp(0.72rem, 2.6vw, 0.86rem);
@@ -785,8 +792,10 @@
     <div class="overlay" id="mapOverlay" hidden>
       <div class="sheet">
         <h2>日本地図</h2>
-        <p style="margin-top:0;">道路線に沿って移動します。破線は橋・フェリーの特別ルートです。</p>
-        <div class="japan-map large" id="japanMapLarge"></div>
+        <p style="margin-top:0;">地図は約3倍に拡大しています。枠の中を上下左右にスクロールして見てください。</p>
+        <div class="map-scroll" tabindex="0" aria-label="拡大した日本地図。上下左右にスクロールできます">
+          <div class="japan-map large" id="japanMapLarge"></div>
+        </div>
         <div class="map-info" id="mapInfoLarge"></div>
         <div class="actions" style="margin-top:14px;">
           <button type="button" class="primary" id="mapCloseBtn">閉じる</button>
