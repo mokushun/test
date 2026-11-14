@@ -797,6 +797,7 @@
 .map-pin.just-got .cap-star { animation:justGotPulse .48s ease-in-out 3; }
 @keyframes justGotPulse { 50%{ transform:scale(1.55) rotate(18deg); filter:drop-shadow(0 0 7px #ffd94d); } }
 @media (prefers-reduced-motion: reduce) { .dice-cube { transition-duration:.25s; } .confetti { display:none; } }
+#resultOverlay .sheet { position:relative; overflow:hidden; }
 </style>
   </head>
   <body>
@@ -858,9 +859,9 @@
         <h2>都道府県ボードゲーム</h2>
         <p>サイコロで道路を進み、都道府県を獲得・防衛しながら全国制覇をめざします。</p>
         <ul>
-          <li>2人：北海道と沖縄からスタート。3人：北海道・沖縄・静岡からスタート</li>
+          <li>スタート地点は毎回ランダム（全員べつべつの県から、その県を持って開始）</li>
           <li>手番順はランダム。サイコロの数だけ道路を進み、到着した県だけ獲得・対決します</li>
-          <li>空いている県は先着で獲得。他の人の県ではサイコロ勝負（所有者は＋1、同点は防衛）</li>
+          <li>空いている県は先着で獲得。他の人の県ではサイコロ勝負（同じ目は防衛の勝ちで、奪えない）</li>
           <li>同じ地方を3県以上所有すると＋3点。各プレイヤー12回ずつ手番を行うと終了</li>
         </ul><h3>プレイ人数</h3><div class="len-row" id="playerCountRow">
           <button type="button" data-count="2" class="selected">2人</button><button type="button" data-count="3">3人</button></div>
@@ -905,6 +906,7 @@
     <!-- result overlay -->
     <div class="overlay" id="resultOverlay" hidden>
       <div class="sheet">
+        <div class="splash-fx" id="resultFx"></div>
         <h2>最終結果</h2>
         <div id="resultBody"></div>
         <div class="actions" style="margin-top:16px;">
@@ -1110,7 +1112,9 @@ let S = null;
 let selectedPlayerCount = 2;
 function newState(){
  const names=["あなた","さくら","たけし"],colors=["#d23b2e","#2f6fd0","#2e9e62"];
- const starts = selectedPlayerCount === 2 ? [0,46] : [0,46,21];
+ const pool = PREFS.map((_,i)=>i);
+ for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
+ const starts = pool.slice(0,selectedPlayerCount);
  const players = names.slice(0,selectedPlayerCount).map((name,i)=>({
    name,color:colors[i],initial:name[0],cpu:i>0,pos:starts[i],startPref:starts[i],visited:{},cards:0
  }));
@@ -1155,6 +1159,7 @@ function renderTokens(hopPlayer) {
   }
 }
 function ownedCount(pi){return Object.values(S.owners).filter(owner=>owner===pi).length;}
+function regionCountOf(pi,key){let n=0;PREFS.forEach((p,k)=>{if(p.region===key&&S.owners[k]===pi)n++;});return n;}
 function regionBonus(pi){return Object.keys(REGIONS).reduce((sum,key)=>sum+(PREFS.filter(p=>p.region===key&&S.owners[PREFS.indexOf(p)]===pi).length>=3?3:0),0);}
 function playerScore(pi){return ownedCount(pi)+regionBonus(pi);}
 function renderStatus(){
@@ -1526,6 +1531,7 @@ async function movePlayer(pi,steps){
 async function resolveArrival(pi){
  const pl=S.players[pi],idx=pl.pos,p=PREFS[idx],owner=S.owners[idx];
  const cd=cardOf(idx);
+ const regKey=p.region,regName=(REGIONS[regKey]||{}).name||"",atkBefore=regionCountOf(pi,regKey);
  let gainTitle="";
   if(cd){$("factBox").innerHTML="<b>"+cd.emoji+" "+p.name+"カード「"+cd.title+"」</b><br>"+cd.fact+"<br>特産品："+cd.specialty;}
   else{$("factBox").innerHTML="<b>"+p.name+"：</b>"+p.fact+"<br>特産品："+p.specialty;}
@@ -1535,27 +1541,29 @@ async function resolveArrival(pi){
   log(pl.name+" が "+p.name+" を新たに獲得");
   renderAll();flashPin(idx);
   await showSplash(p.name+" GET！",pl.name+" が獲得！","get",pl.cpu?850:1250);
+  if(atkBefore<3&&regionCountOf(pi,regKey)>=3)await showSplash("🎊 "+regName+" 制覇！",pl.name+" が "+regName+" で3県以上！ 地方ボーナス +3点","get",pl.cpu?900:1200);
  }else if(owner===pi){
   setMsg(pl.name+" は自分の "+p.name+" に到着しました。");
   log(pl.name+" は自分の "+p.name+" に到着");
  }else{
   const defender=S.players[owner];
+  const defBefore=regionCountOf(owner,regKey);
   setMsg(pl.name+" が "+p.name+" に到着！所有者 "+defender.name+" と対決！");
   let attack,defense;
   if(!pl.cpu){
-   await showSplash("⚔️ 対決！",defender.name+" の "+p.name+" を うばえるか？","duel",1100);
+   await showSplash("⚔️ 対決！",pl.name+" VS "+defender.name+"｜"+p.name+" をかけた対決！","duel",1100);
    showDice("相手の防衛ロール");
-   defense=(await rollDiceAnimated())+1;
-   $("diceNote").textContent=defender.name+" の防衛："+(defense-1)+" ＋防衛1 ＝ 合計 "+defense;
+   defense=await rollDiceAnimated();
+   $("diceNote").textContent=defender.name+" の防衛："+defense;
    await wait(900);
    const needA=defense+1;
    const targetA=needA<=6?("あなたは "+needA+" 以上で勝ち！"):("相手は合計 "+defense+"。"+needA+" 以上の目は出ないので今回は奪えないけど、振ってみよう");
    setMsg("対決！ "+targetA);
    showWait("サイコロをタップして対決！");
-   await waitDiceClick("あなたの攻撃ロール",defender.name+" の防衛は "+(defense-1)+"＋1＝"+defense+"。"+targetA);
+   await waitDiceClick("あなたの攻撃ロール",defender.name+" の防衛は "+defense+"。"+targetA);
    $("actions").innerHTML="";
    attack=await rollDiceAnimated();
-   $("diceNote").textContent=pl.name+"："+attack+" ／ "+defender.name+"："+(defense-1)+"＋防衛1";
+   $("diceNote").textContent=pl.name+"："+attack+" ／ "+defender.name+"："+defense;
    await wait(1300);
    hideDice();
   }else if(!defender.cpu){
@@ -1563,21 +1571,21 @@ async function resolveArrival(pi){
    attack=await rollDiceAnimated();
    $("diceNote").textContent=pl.name+" の攻撃："+attack;
    await wait(900);
-   await showSplash("⚔️ 挑戦された！",pl.name+" が あなたの "+p.name+" に挑戦！","duel",1200);
-   const needD=attack-1;
+   await showSplash("⚔️ 挑戦された！",pl.name+" VS "+defender.name+"｜"+p.name+" を守れるか？","duel",1200);
+   const needD=attack;
    const targetD=needD<=1?"どの目を出しても守れるよ（同点は防衛の勝ち）":(needD+" 以上の目で守れる！（同点は防衛の勝ち）");
    setMsg("防衛の番です。"+targetD);
    showWait("サイコロをタップして防衛！");
    await waitDiceClick("あなたの防衛ロール",pl.name+" の攻撃は "+attack+"。"+targetD);
    $("actions").innerHTML="";
-   defense=(await rollDiceAnimated())+1;
-   $("diceNote").textContent=pl.name+"："+attack+" ／ "+defender.name+"："+(defense-1)+"＋防衛1";
+   defense=await rollDiceAnimated();
+   $("diceNote").textContent=pl.name+"："+attack+" ／ "+defender.name+"："+defense;
    await wait(1300);
    hideDice();
   }else{
    await wait(450);
-   attack=1+Math.floor(Math.random()*6);defense=1+Math.floor(Math.random()*6)+1;
-   renderDice(attack);$("diceNote").textContent=pl.name+"："+attack+" ／ "+defender.name+"："+(defense-1)+"＋防衛1";
+   attack=1+Math.floor(Math.random()*6);defense=1+Math.floor(Math.random()*6);
+   renderDice(attack);$("diceNote").textContent=pl.name+"："+attack+" ／ "+defender.name+"："+defense;
    await wait(500);
   }
   const won=attack>defense;
@@ -1591,7 +1599,7 @@ async function resolveArrival(pi){
   }
   if(!pl.cpu||!defender.cpu){
    let sTitle,sSub,sKind;
-   if(!pl.cpu&&won){sTitle="🎉 "+p.name+" GET！";sSub=p.name+" を うばった！";sKind="get";}
+   if(!pl.cpu&&won){sTitle="🎉 奪取成功！";sSub=p.name+" GET！";sKind="get";}
    else if(!pl.cpu&&!won){sTitle="💦 防衛された…";sSub=defender.name+" が "+p.name+" を守りきった";sKind="lose";}
    else if(won){sTitle="😱 うばわれた…";sSub=p.name+" を "+pl.name+" に取られた";sKind="lose";}
    else{sTitle="🛡️ 防衛成功！";sSub=p.name+" を守った！";sKind="win";}
@@ -1599,6 +1607,12 @@ async function resolveArrival(pi){
   }else if(won){
    renderAll();flashPin(idx);
    await showSplash(p.name+" GET！",pl.name+" が "+defender.name+" から奪取！","get",850);
+  }else{
+   await showSplash("🛡️ 防衛成功！",defender.name+" が "+p.name+" を守った（"+attack+" 対 "+defense+"）","win",800);
+  }
+  if(won){
+   if(atkBefore<3&&regionCountOf(pi,regKey)>=3)await showSplash("🎊 "+regName+" 制覇！",pl.name+" が "+regName+" で3県以上！ 地方ボーナス +3点","get",(!pl.cpu||!defender.cpu)?1200:900);
+   if(defBefore>=3&&regionCountOf(owner,regKey)<3)await showSplash("💦 "+regName+" ボーナス消失",defender.name+" は "+regName+" が2県に… 地方ボーナス -3点","lose",1000);
   }
  }
  renderAll();
@@ -1636,6 +1650,7 @@ function showResults(){
  let html=note+'<table class="rank-table"><tr><th>順位</th><th>プレイヤー</th><th>所有県</th><th>地方ボーナス</th><th>合計点</th></tr>';
  rows.forEach((r)=>html+="<tr"+(r.rank===1?' class="winner"':"")+"><td>"+r.rank+"位</td><td>"+S.players[r.i].name+"</td><td>"+r.owned+"県</td><td>+"+r.bonus+"点</td><td><b>"+r.score+"点</b></td></tr>");
  $("resultBody").innerHTML=html+"</table><p>12ターン終了！ 所有する都道府県1県につき1点、同じ地方を3県以上所有すると地方ごとに3点です。同点（合計点も所有県数も同じ）の場合は全員が優勝です。</p>";$("resultOverlay").hidden=false;
+ const rfx=$("resultFx");if(rfx){rfx.innerHTML="";const colors=["#f4bd4c","#e4572e","#3f7fbf","#43a05a","#ff5b8d","#ffffff"];for(let i=0;i<26;i++){const s=document.createElement("span");s.className="confetti";s.style.left=(2+Math.random()*96)+"%";s.style.background=colors[i%colors.length];s.style.animationDelay=(Math.random()*0.6)+"s";rfx.appendChild(s);}}
 }
 
 function startGame(){
