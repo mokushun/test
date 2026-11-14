@@ -327,6 +327,7 @@
       .prefmap path {
         fill: var(--land); stroke: var(--land-line);
         stroke-width: 0.5; stroke-linejoin: round;
+        transition: fill .2s ease;
       }
       .prefmap path.dest-pref {
         stroke: var(--gold); stroke-width: 1.1;
@@ -734,7 +735,7 @@
         <div class="hero-mascot" aria-hidden="true">🗾✨</div>
       </header>
       <div class="explore-progress" aria-live="polite">
-        <div class="progress-label"><span>🧭 たんけんした県</span><strong id="exploreCount">0 / 47 県</strong></div>
+        <div class="progress-label"><span>🏁 だれかが所有している県</span><strong id="exploreCount">0 / 47 県</strong></div>
         <div class="progress-track"><span id="exploreBar"></span></div>
       </div>
       <div class="dest-banner" id="destBanner"></div>
@@ -777,7 +778,7 @@
       </section>
 
       <details class="panel props-panel">
-        <summary>あなたの訪問記録</summary>
+        <summary>あなたの都道府県カード</summary>
         <ul class="myprops" id="myProps"></ul>
       </details>
     </div>
@@ -786,12 +787,14 @@
     <div class="overlay" id="startOverlay">
       <div class="sheet">
         <h2>都道府県ボードゲーム</h2>
-        <p>サイコロで道路を進み、47都道府県を旅するゲームです。初めて訪れた県のご当地カードを集めます。</p>
+        <p>サイコロで道路を進み、都道府県を獲得・防衛しながら全国制覇をめざします。</p>
         <ul>
-          <li>サイコロの数だけ道路を1県ずつ進みます</li><li>分かれ道では次の都道府県を選びます</li>
-          <li>初めて訪れた県ではご当地カードを獲得します</li><li>海峡・離島は橋やフェリーの特別ルートで接続します</li>
+          <li>2人：北海道と沖縄からスタート。3人：北海道・沖縄・静岡からスタート</li>
+          <li>手番順はランダム。サイコロの数だけ道路を進み、到着した県だけ獲得・対決します</li>
+          <li>空いている県は先着で獲得。他の人の県ではサイコロ勝負（所有者は＋1、同点は防衛）</li>
+          <li>同じ地方を3県以上所有すると＋3点。各プレイヤー12回ずつ手番を行うと終了</li>
         </ul><h3>プレイ人数</h3><div class="len-row" id="playerCountRow">
-          <button type="button" data-count="2" class="selected">2人</button><button type="button" data-count="3">3人</button><button type="button" data-count="4">4人</button></div>
+          <button type="button" data-count="2" class="selected">2人</button><button type="button" data-count="3">3人</button></div>
         <div class="sticky-footer">
           <button type="button" class="primary big-start" id="startBtn">ゲームスタート</button>
         </div>
@@ -999,8 +1002,15 @@ const EVENTS = [
 let S = null;
 let selectedPlayerCount = 2;
 function newState(){
- const names=["あなた","さくら","たけし","ゆき"],colors=["#d23b2e","#2f6fd0","#2e9e62","#dd8f2b"];
- return {current:0,turn:1,players:names.slice(0,selectedPlayerCount).map((name,i)=>({name,color:colors[i],initial:name[0],cpu:i>0,pos:36,visited:{},cards:0})),learned:{},over:false};
+ const names=["あなた","さくら","たけし"],colors=["#d23b2e","#2f6fd0","#2e9e62"];
+ const starts = selectedPlayerCount === 2 ? [0,46] : [0,46,21];
+ const players = names.slice(0,selectedPlayerCount).map((name,i)=>({
+   name,color:colors[i],initial:name[0],cpu:i>0,pos:starts[i],startPref:starts[i],visited:{},cards:0
+ }));
+ for(let i=players.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[players[i],players[j]]=[players[j],players[i]];}
+ const owners={};
+ players.forEach((pl,pi)=>{owners[pl.startPref]=pi;pl.visited[pl.startPref]=true;pl.cards=1;});
+ return {current:0,turn:1,players,owners,learned:Object.fromEntries(starts.map(i=>[i,true])),over:false};
 }
 
 /* ================= helpers ================= */
@@ -1139,19 +1149,23 @@ function renderTiles() {
     }
   }
 }
+function ownedCount(pi){return Object.values(S.owners).filter(owner=>owner===pi).length;}
+function regionBonus(pi){return Object.keys(REGIONS).reduce((sum,key)=>sum+(PREFS.filter(p=>p.region===key&&S.owners[PREFS.indexOf(p)]===pi).length>=3?3:0),0);}
+function playerScore(pi){return ownedCount(pi)+regionBonus(pi);}
 function renderStatus(){
  const box=$("status");box.innerHTML="";
  S.players.forEach((pl,pi)=>{const d=document.createElement("div");d.className="pcard"+(pi===S.current&&!S.over?" turn":"");d.style.setProperty("--pc",pl.color);
- const n=Object.keys(pl.visited).length;d.innerHTML='<div class="pname"><span class="pdot"></span>'+pl.name+(pl.cpu?'<span class="cpu-tag">CPU</span>':"")+'</div><div class="pmoney">'+n+' / 47県</div><div class="psub">訪問 '+n+'県 ・ カード '+pl.cards+'枚</div>';box.appendChild(d);});
- const pl=S.players[S.current],p=PREFS[pl.pos];$("destBanner").innerHTML='<span class="date-chip">第'+S.turn+'ターン</span><span>現在地：<b>'+p.name+'</b></span>';
- $("centerSub").textContent="道路ネットワークで全国をたんけん";$("centerTitle").textContent=pl.name+" は "+p.name+" にいます";
- const n=Object.keys(S.learned).length;$("exploreCount").textContent=n+" / 47 県";$("exploreBar").style.width=(n/47*100)+"%";
+ const n=ownedCount(pi),bonus=regionBonus(pi);d.innerHTML='<div class="pname"><span class="pdot"></span>'+pl.name+(pl.cpu?'<span class="cpu-tag">CPU</span>':"")+'</div><div class="pmoney">'+playerScore(pi)+'点</div><div class="psub">所有 '+n+'県 ・ 地方ボーナス +'+bonus+'点</div>';box.appendChild(d);});
+ const pl=S.players[S.current],p=PREFS[pl.pos];$("destBanner").innerHTML='<span class="date-chip">第'+S.turn+'ターン / 12</span><span>現在地：<b>'+p.name+'</b></span>';
+ $("centerSub").textContent="12ターン（1年）で47都道府県を取り合おう";$("centerTitle").textContent=pl.name+" は "+p.name+" にいます";
+ const n=Object.keys(S.owners).length;$("exploreCount").textContent=n+" / 47 県";$("exploreBar").style.width=(n/47*100)+"%";
 }
 
 function renderMyProps(){
- const ul=$("myProps");ul.innerHTML="";const keys=Object.keys(S.players[0].visited);
- if(!keys.length){ul.innerHTML='<li class="empty-note">まだ訪問した県はありません。</li>';return;}
- keys.sort((a,b)=>+a-+b).forEach(k=>{const li=document.createElement("li");li.textContent=PREFS[+k].name+" — "+PREFS[+k].specialty;ul.appendChild(li);});
+ const ul=$("myProps");ul.innerHTML="";
+ const keys=Object.keys(S.owners).filter(k=>S.owners[k]===0).map(Number).sort((a,b)=>a-b);
+ if(!keys.length){ul.innerHTML='<li class="empty-note">まだカードを持っていません。</li>';return;}
+ keys.forEach(k=>{const p=PREFS[k],li=document.createElement("li");li.textContent=p.name+"｜"+p.specialty+"｜"+p.fact;ul.appendChild(li);});
 }
 
 function renderPlayerColors() {
@@ -1170,7 +1184,7 @@ function renderPlayerColors() {
   });
   const note = document.createElement("span");
   note.className = "pcolor-note";
-  note.textContent = "プレイヤーの位置と訪問した県を表示しています";
+  note.textContent = "県の色は所有者。到着した県だけ獲得・対決します";
   box.appendChild(note);
 }
 function renderAll() { renderStatus(); renderTiles(); renderTokens(-1); renderMyProps(); renderPlayerColors(); renderMaps(); }
@@ -1255,8 +1269,9 @@ function buildJapanMap(container,infoEl){
 
 function mapInfoHTML(i){
  const p=PREFS[i],links=ROAD_GRAPH[i].map(x=>PREFS[x.to].name+(x.edge.type==="road"?"":"（"+x.edge.label+"）")).join("、");
+ const owner=S.owners[i],ownerText=owner===undefined?"未所有":S.players[owner].name+"の所有";
  const visitors=S.players.filter(pl=>pl.visited[i]).map(pl=>pl.name).join("・");
- return "<b>"+p.name+"</b>（"+REGIONS[p.region].name+"） 県庁所在地："+p.capital+" 特産品："+p.specialty+"<br>"+(visitors?"訪問："+visitors:"未訪問")+"<br>道路接続："+links;
+ return "<b>"+p.name+"</b>（"+REGIONS[p.region].name+"） 県庁所在地："+p.capital+"<br>所有者："+ownerText+"<br>特産品："+p.specialty+"<br>"+(visitors?"到着した人："+visitors:"まだ誰も到着していません")+"<br>道路接続："+links;
 }
 
 function selectPrefOnMap(prefIdx) {
@@ -1264,10 +1279,18 @@ function selectPrefOnMap(prefIdx) {
   mapInstances.forEach((inst) => { if (inst.infoEl) inst.infoEl.innerHTML = mapInfoHTML(prefIdx); });
 }
 function renderMaps(){
- if(!S)return;mapInstances.forEach(inst=>{inst.pins.forEach((pin,i)=>{const pips=pin.querySelector(".pips");pips.innerHTML="";
- S.players.forEach((pl,pi)=>{if(pl.pos===i){const d=document.createElement("span");d.className="pip-player";d.setAttribute("data-player",pi);d.style.background=pl.color;d.textContent=pl.initial;pips.appendChild(d);}});
- pin.classList.toggle("owned",!!S.learned[i]);});
- if(inst.infoEl)inst.infoEl.innerHTML=mapInfoHTML(selectedPref>=0?selectedPref:S.players[S.current].pos);});
+ if(!S)return;mapInstances.forEach(inst=>{
+  inst.pins.forEach((pin,i)=>{
+   const pips=pin.querySelector(".pips");pips.innerHTML="";
+   S.players.forEach((pl,pi)=>{if(pl.pos===i){const d=document.createElement("span");d.className="pip-player";d.setAttribute("data-player",pi);d.style.background=pl.color;d.textContent=pl.initial;pips.appendChild(d);}});
+   const owner=S.owners[i],owned=owner!==undefined;
+   pin.classList.toggle("owned",owned);
+   pin.style.setProperty("--pc",owned?S.players[owner].color:"var(--rc)");
+   const path=inst.prefPaths[i];
+   if(path)path.style.fill=owned?S.players[owner].color:"";
+  });
+  if(inst.infoEl)inst.infoEl.innerHTML=mapInfoHTML(selectedPref>=0?selectedPref:S.players[S.current].pos);
+ });
 }
 
 /* ================= quiz ================= */
@@ -1396,9 +1419,13 @@ async function movePlayer(pi,steps){
   let chosen=opts[0];
   if(opts.length>1&&!pl.cpu){const pick=await humanChoice(opts.map(o=>({label:PREFS[o.to].name+(o.edge.type==="road"?"":"（"+o.edge.label+"）")})));chosen=opts[pick];}
   else if(pl.cpu)chosen=opts[Math.floor(Math.random()*opts.length)];
-  pl.pos=chosen.to;const first=!pl.visited[pl.pos];pl.visited[pl.pos]=true;S.learned[pl.pos]=true;if(first)pl.cards++;
-  renderTokens(pi);renderStatus();renderMaps();setMsg(pl.name+" は "+PREFS[pl.pos].name+" に到着。"+(first?"初訪問カードを獲得！":""));await wait(pl.cpu?170:220);
+  pl.pos=chosen.to;
+  renderTokens(pi);renderStatus();renderMaps();
+  setMsg(pl.name+" は "+PREFS[pl.pos].name+" を通過中…");
+  await wait(pl.cpu?100:140);
  }
+ pl.visited[pl.pos]=true;
+ return pl.pos;
 }
 
 async function settlement(pi) {
@@ -1562,30 +1589,72 @@ async function resolveTile(pi) {
   await wait(pl.cpu ? 450 : 700);
 }
 
+async function resolveArrival(pi){
+ const pl=S.players[pi],idx=pl.pos,p=PREFS[idx],owner=S.owners[idx];
+ $("factBox").innerHTML="<b>"+p.name+"：</b>"+p.fact+"<br>特産品："+p.specialty;
+ if(owner===undefined){
+  S.owners[idx]=pi;pl.cards++;
+  setMsg(pl.name+" が "+p.name+" を獲得！「"+p.specialty+"」カードを手に入れました。");
+  log(pl.name+" が "+p.name+" を新たに獲得");
+ }else if(owner===pi){
+  setMsg(pl.name+" は自分の "+p.name+" に到着しました。");
+  log(pl.name+" は自分の "+p.name+" に到着");
+ }else{
+  const defender=S.players[owner];
+  setMsg(pl.name+" が "+p.name+" に到着！所有者 "+defender.name+" と対決！");
+  await wait(450);
+  const attack=1+Math.floor(Math.random()*6),defense=1+Math.floor(Math.random()*6)+1;
+  renderDice(attack);$("diceNote").textContent=pl.name+"："+attack+" ／ "+defender.name+"："+(defense-1)+"＋防衛1";
+  const won=attack>defense;
+  await wait(500);
+  if(won){
+   S.owners[idx]=pi;pl.cards++;defender.cards--;
+   setMsg(pl.name+" の勝ち！ "+p.name+" とカードを奪いました。（"+attack+" 対 "+defense+"）");
+   log(pl.name+" が "+defender.name+" から "+p.name+" を奪取");
+  }else{
+   setMsg(defender.name+" が防衛成功！ "+p.name+" はそのまま。（挑戦 "+attack+" 対 防衛 "+defense+"）");
+   log(defender.name+" が "+p.name+" を防衛");
+  }
+ }
+ renderAll();
+ await wait(pl.cpu?350:650);
+}
 async function playTurn(pi){
  const pl=S.players[pi];S.current=pi;renderStatus();
  if(!pl.cpu){setMsg("あなたの番です。サイコロをタップしてください。");$("diceNote").textContent=pl.name+"の番";showWait("サイコロをタップしてね");await waitDiceClick();$("actions").innerHTML="";}
  else{setMsg(pl.name+"（CPU）の番です…");showWait(pl.name+"の番です");await wait(400);}
  const roll=1+Math.floor(Math.random()*6),dice=$("dice");dice.classList.remove("rolling");void dice.offsetWidth;dice.classList.add("rolling");
  for(let i=0;i<5;i++){renderDice(1+Math.floor(Math.random()*6));await wait(65);}renderDice(roll);$("diceNote").textContent=pl.name+"："+roll+" が出た";
- log(pl.name+" は "+roll+" マス進みます");await wait(200);await movePlayer(pi,roll);renderAll();
- const p=PREFS[pl.pos];$("factBox").innerHTML="<b>"+p.name+"：</b>"+p.fact+"<br>特産品："+p.specialty;
+ log(pl.name+" は "+roll+" マス進みます");await wait(200);
+ await movePlayer(pi,roll);
+ await resolveArrival(pi);
+ renderAll();
 }
 
 async function gameLoop(){
- S.turn=1;while(!S.over){for(let i=0;i<S.players.length;i++)await playTurn(i);S.turn++;if(S.turn>12)S.over=true;}showResults();
+ S.turn=1;
+ while(S.turn<=12&&!S.over){
+  for(let i=0;i<S.players.length;i++)await playTurn(i);
+  S.turn++;
+  if(S.turn<=12)renderStatus();
+ }
+ S.over=true;
+ showResults();
 }
 
 function showResults(){
- gameRunning=false;showWait("ゲーム終了！");const rows=S.players.map((p,i)=>({i,n:Object.keys(p.visited).length,c:p.cards})).sort((a,b)=>b.n-a.n||b.c-a.c);
- let html='<table class="rank-table"><tr><th>順位</th><th>プレイヤー</th><th>訪問県</th><th>カード</th></tr>';
- rows.forEach((r,i)=>html+="<tr"+(i===0?' class="winner"':"")+"><td>"+(i+1)+"位</td><td>"+S.players[r.i].name+"</td><td>"+r.n+"県</td><td>"+r.c+"枚</td></tr>");
- $("resultBody").innerHTML=html+"</table><p>訪問した都道府県とカード枚数で集計しました。</p>";$("resultOverlay").hidden=false;
+ gameRunning=false;showWait("ゲーム終了！");
+ const rows=S.players.map((p,i)=>({i,owned:ownedCount(i),bonus:regionBonus(i),score:playerScore(i)})).sort((a,b)=>b.score-a.score||b.owned-a.owned);
+ let html='<table class="rank-table"><tr><th>順位</th><th>プレイヤー</th><th>所有県</th><th>地方ボーナス</th><th>合計点</th></tr>';
+ rows.forEach((r,i)=>html+="<tr"+(i===0?' class="winner"':"")+"><td>"+(i+1)+"位</td><td>"+S.players[r.i].name+"</td><td>"+r.owned+"点</td><td>+"+r.bonus+"点</td><td><b>"+r.score+"点</b></td></tr>");
+ $("resultBody").innerHTML=html+"</table><p>12ターン終了！ 所有する都道府県1県につき1点、同じ地方を3県以上所有すると地方ごとに3点です。</p>";$("resultOverlay").hidden=false;
 }
 
 function startGame(){
- S=newState();S.turn=1;S.players.forEach(p=>{p.visited[36]=true;});S.learned[36]=true;renderAll();renderDice(1);
- log("ゲームスタート！ 全員が香川県から出発します。");setMsg("道路を進んで全国をたんけんしよう。分かれ道では進む県を選べます。");
+ S=newState();S.turn=1;renderAll();renderDice(1);
+ log("ゲームスタート！ 手番順はランダム。各プレイヤーは12回ずつ手番を行います。");
+ const starts=S.players.map(p=>p.name+"："+PREFS[p.pos].name).join("、");
+ setMsg("スタート地点："+starts+"。到着した県だけを獲得・対決します。");
  gameLoop().catch(err=>{if(window.console)console.error(err);gameRunning=false;setMsg("エラーで停止しました："+err.message);showWait("再読み込みしてください");});
 }
 
