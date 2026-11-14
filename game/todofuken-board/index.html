@@ -773,6 +773,9 @@
 @keyframes pickedFlash { 0%{ filter:brightness(1);} 30%{ filter:brightness(1.9) drop-shadow(0 0 12px #ffd23f);} 100%{ filter:brightness(1);} }
 
 .winner-note { text-align:center; font-size:clamp(17px,4.6vw,22px); font-weight:900; margin:4px 0 10px; }
+
+/* ===== name labels must not eat pin taps (2026-11-14) ===== */
+.pref-name-label, .sea-label, .north-arrow, .inset-label { pointer-events:none; }
 </style>
   </head>
   <body>
@@ -1285,7 +1288,8 @@ function buildJapanMap(container,infoEl){
  const dec=document.createElement("div");dec.innerHTML='<span class="sea-label japansea">日本海</span><span class="sea-label pacific">太平洋</span><span class="north-arrow">▲<br>北</span>';while(dec.firstChild)container.appendChild(dec.firstChild);
  const inset=document.createElement("div");inset.className="okinawa-inset";inset.innerHTML=OKINAWA_SVG+'<span class="inset-label">沖縄</span>';container.appendChild(inset);
  inst.prefPaths=Array.from(container.querySelectorAll(".pref-shape"));drawRoads(container);
- PREFS.forEach((p,i)=>{if(i===46)return;const path=inst.prefPaths[i];if(!path)return;const label=document.createElement("span");label.className="pref-name-label";label.textContent=p.short;label.style.left=MAP_POS[i].x+"%";label.style.top=(MAP_POS[i].y+2.6)+"%";container.appendChild(label);inst.prefLabels.push(label);});
+ PREFS.forEach((p,i)=>{if(i===46)return;const path=inst.prefPaths[i];if(!path)return;const dAttr=path.getAttribute("d")||"";let bc=null,ba=-1;dAttr.split("M").forEach(sg=>{const ns=sg.match(/-?[\d.]+/g);if(!ns||ns.length<4)return;const xs=[],ys=[];for(let n=0;n+1<ns.length;n+=2){xs.push(+ns[n]);ys.push(+ns[n+1]);}const x0=Math.min.apply(null,xs),x1=Math.max.apply(null,xs),y0=Math.min.apply(null,ys),y1=Math.max.apply(null,ys),ar=(x1-x0)*(y1-y0);if(ar>ba){ba=ar;bc={x:(x0+x1)/2,y:(y0+y1)/2};}});
+  const label=document.createElement("span");label.className="pref-name-label";label.textContent=p.short;label.style.left=(bc?bc.x:MAP_POS[i].x)+"%";label.style.top=(bc?bc.y:MAP_POS[i].y)+"%";container.appendChild(label);inst.prefLabels.push(label);});
  PREFS.forEach((p,i)=>{const pos=MAP_POS[i],b=document.createElement("button");b.type="button";b.className="map-pin"+(pos.flip?" flip":"");b.style.setProperty("--rc",REGIONS[p.region].color);
  b.setAttribute("aria-label",p.name+"（県庁所在地："+p.capital+"）");b.innerHTML='<span class="cap-star">★</span><span class="cap-lab">'+p.short+'<span class="cap-name">'+p.capital+'</span></span><span class="pips"></span>';
  b.style.left=pos.x+"%";b.style.top=pos.y+"%";(pos.inset?inset:container).appendChild(b);b.addEventListener("pointerdown",(e)=>{pinPress={i:i,x:e.clientX,y:e.clientY};});b.addEventListener("pointerup",(e)=>{if(pinPress&&pinPress.i===i&&Math.hypot(e.clientX-pinPress.x,e.clientY-pinPress.y)<12){pinPress=null;lastPinTap={i:i,t:Date.now()};handlePinClick(i);}});b.addEventListener("pointercancel",()=>{pinPress=null;});b.addEventListener("click",()=>{if(lastPinTap.i===i&&Date.now()-lastPinTap.t<700)return;handlePinClick(i);});inst.pins.push(b);});
