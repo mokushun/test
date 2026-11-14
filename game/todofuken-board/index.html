@@ -721,7 +721,20 @@
         .sea-players .pcard .psub { display: none; }
         .sea-control { width: min(310px, 72%); }
       }
-    </style>
+    
+/* ===== prefecture cards (prefecture-cards.js) ===== */
+.props-panel li.pcard { list-style:none; margin:0 0 10px; padding:8px 10px; background:#fff8ec; border:1px solid #e8d9b8; border-radius:10px; }
+.pcard-head { font-weight:700; }
+.pcard-spec { color:#8a6d2f; font-size:.92em; }
+.pcard-fact { margin-top:2px; }
+.pcard-quiz { margin-top:6px; }
+.pcard-quiz-q { font-weight:700; }
+.cq-btn { margin:3px 4px 0 0; padding:4px 10px; border-radius:999px; border:1px solid #c9b98a; background:#fff; cursor:pointer; }
+.cq-btn.correct { background:#2e9e62; color:#fff; border-color:#2e9e62; }
+.cq-btn.wrong { background:#d23b2e; color:#fff; border-color:#d23b2e; }
+.cq-exp { margin-top:4px; color:#2e6b34; }
+.map-card { margin-top:6px; padding-top:6px; border-top:1px dashed #c9b98a; }
+</style>
   </head>
   <body>
     <div class="wrap">
@@ -825,6 +838,7 @@
       </div>
     </div>
 
+    <script src="prefecture-cards.js"></script>
     <script>
 "use strict";
 /* ================= data ================= */
@@ -1015,6 +1029,13 @@ function newState(){
 
 /* ================= helpers ================= */
 const $ = (id) => document.getElementById(id);
+/* ===== prefecture card data (optional: prefecture-cards.js) ===== */
+const CARD_BY_NAME = {};
+if (typeof window !== "undefined" && Array.isArray(window.PREFECTURE_CARD_DATA)) {
+  window.PREFECTURE_CARD_DATA.forEach((c) => { if (c && c.name) CARD_BY_NAME[c.name] = c; });
+}
+function cardOf(i) { return CARD_BY_NAME[PREFS[i].name] || null; }
+function humanIndex() { return S.players.findIndex((pl) => !pl.cpu); }
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 function fmt(n) { return (n < 0 ? "−" : "") + Math.abs(Math.round(n)).toLocaleString("ja-JP"); }
 function prefOf(boardIdx) { return PREFS[boardIdx - 1]; }
@@ -1164,9 +1185,34 @@ function renderStatus(){
 
 function renderMyProps(){
  const ul=$("myProps");ul.innerHTML="";
- const keys=Object.keys(S.owners).filter(k=>S.owners[k]===0).map(Number).sort((a,b)=>a-b);
+ const hi=humanIndex();
+ const keys=Object.keys(S.owners).filter(k=>S.owners[k]===hi).map(Number).sort((a,b)=>a-b);
  if(!keys.length){ul.innerHTML='<li class="empty-note">まだカードを持っていません。</li>';return;}
- keys.forEach(k=>{const p=PREFS[k],li=document.createElement("li");li.textContent=p.name+"｜"+p.specialty+"｜"+p.fact;ul.appendChild(li);});
+ keys.forEach(k=>{
+  const p=PREFS[k],cd=cardOf(k),li=document.createElement("li");
+  if(!cd){li.textContent=p.name+"｜"+p.specialty+"｜"+p.fact;ul.appendChild(li);return;}
+  li.className="pcard";
+  const head=document.createElement("div");head.className="pcard-head";
+  head.textContent=cd.emoji+" "+p.name+"「"+cd.title+"」";
+  const spec=document.createElement("div");spec.className="pcard-spec";spec.textContent="特産品："+cd.specialty;
+  const fact=document.createElement("div");fact.className="pcard-fact";fact.textContent=cd.fact;
+  li.appendChild(head);li.appendChild(spec);li.appendChild(fact);
+  const quiz=document.createElement("div");quiz.className="pcard-quiz";
+  const q=document.createElement("div");q.className="pcard-quiz-q";q.textContent="クイズ："+cd.question;
+  quiz.appendChild(q);
+  const exp=document.createElement("div");exp.className="cq-exp";
+  cd.choices.forEach(ch=>{
+   const b=document.createElement("button");b.type="button";b.className="cq-btn";b.textContent=ch;
+   b.addEventListener("click",()=>{
+    quiz.querySelectorAll("button").forEach(x=>{x.disabled=true;if(x.textContent===cd.answer)x.classList.add("correct");else if(x===b)x.classList.add("wrong");});
+    exp.textContent=(ch===cd.answer?"正解！ ":"ざんねん、正解は「"+cd.answer+"」。 ")+cd.explanation;
+   });
+   quiz.appendChild(b);
+  });
+  quiz.appendChild(exp);
+  li.appendChild(quiz);
+  ul.appendChild(li);
+ });
 }
 
 function renderPlayerColors() {
@@ -1272,7 +1318,7 @@ function mapInfoHTML(i){
  const p=PREFS[i],links=ROAD_GRAPH[i].map(x=>PREFS[x.to].name+(x.edge.type==="road"?"":"（"+x.edge.label+"）")).join("、");
  const owner=S.owners[i],ownerText=owner===undefined?"未所有":S.players[owner].name+"の所有";
  const visitors=S.players.filter(pl=>pl.visited[i]).map(pl=>pl.name).join("・");
- return "<b>"+p.name+"</b>（"+REGIONS[p.region].name+"） 県庁所在地："+p.capital+"<br>所有者："+ownerText+"<br>特産品："+p.specialty+"<br>"+(visitors?"到着した人："+visitors:"まだ誰も到着していません")+"<br>道路接続："+links;
+ return "<b>"+p.name+"</b>（"+REGIONS[p.region].name+"） 県庁所在地："+p.capital+"<br>所有者："+ownerText+"<br>特産品："+p.specialty+"<br>"+(visitors?"到着した人："+visitors:"まだ誰も到着していません")+"<br>道路接続："+links+(function(){const cd=cardOf(i);if(!cd)return "";return "<div class=\"map-card\"><b>"+cd.emoji+" "+p.name+"カード「"+cd.title+"」</b><br>"+cd.fact+"<br>クイズ："+cd.question+"<details><summary>答えと解説を見る</summary>答え："+cd.answer+"<br>"+cd.explanation+"</details></div>";})();
 }
 
 function selectPrefOnMap(prefIdx) {
@@ -1604,7 +1650,9 @@ async function resolveTile(pi) {
 
 async function resolveArrival(pi){
  const pl=S.players[pi],idx=pl.pos,p=PREFS[idx],owner=S.owners[idx];
- $("factBox").innerHTML="<b>"+p.name+"：</b>"+p.fact+"<br>特産品："+p.specialty;
+ const cd=cardOf(idx);
+  if(cd){$("factBox").innerHTML="<b>"+cd.emoji+" "+p.name+"カード「"+cd.title+"」</b><br>"+cd.fact+"<br>特産品："+cd.specialty;}
+  else{$("factBox").innerHTML="<b>"+p.name+"：</b>"+p.fact+"<br>特産品："+p.specialty;}
  if(owner===undefined){
   S.owners[idx]=pi;pl.cards++;
   setMsg(pl.name+" が "+p.name+" を獲得！「"+p.specialty+"」カードを手に入れました。");
