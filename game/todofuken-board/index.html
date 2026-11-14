@@ -756,6 +756,12 @@
 .tc-choices .cq-btn { margin-top:5px; }
 .card-sheet { max-width:300px; margin:0 auto; }
 .tcard-pop { max-width:230px; margin:0 auto; }
+
+/* ===== map: choice targets & centering (2026-11-14) ===== */
+.map-pin.choice-target { z-index:30; }
+.map-pin.choice-target .cap-star { color:#ffb400; text-shadow:0 0 6px #ffb400,0 0 2px #fff; animation:choicePulse .8s ease-in-out infinite alternate; }
+.map-pin.choice-target .cap-lab { background:#fff3c4; border-color:#ffb400; font-weight:800; }
+@keyframes choicePulse { from { transform:scale(1); } to { transform:scale(1.45); } }
 </style>
   </head>
   <body>
@@ -1370,7 +1376,7 @@ function buildJapanMap(container,infoEl){
  PREFS.forEach((p,i)=>{if(i===46)return;const path=inst.prefPaths[i];if(!path)return;const box=path.getBBox();const label=document.createElement("span");label.className="pref-name-label";label.textContent=p.short;label.style.left=(box.x+box.width/2)+"%";label.style.top=(box.y+box.height/2)+"%";container.appendChild(label);inst.prefLabels.push(label);});
  PREFS.forEach((p,i)=>{const pos=MAP_POS[i],b=document.createElement("button");b.type="button";b.className="map-pin"+(pos.flip?" flip":"");b.style.setProperty("--rc",REGIONS[p.region].color);
  b.setAttribute("aria-label",p.name+"（県庁所在地："+p.capital+"）");b.innerHTML='<span class="cap-star">★</span><span class="cap-lab">'+p.short+'<span class="cap-name">'+p.capital+'</span></span><span class="pips"></span>';
- b.style.left=pos.x+"%";b.style.top=pos.y+"%";(pos.inset?inset:container).appendChild(b);b.addEventListener("click",()=>selectPrefOnMap(i));inst.pins.push(b);});
+ b.style.left=pos.x+"%";b.style.top=pos.y+"%";(pos.inset?inset:container).appendChild(b);b.addEventListener("click",()=>handlePinClick(i));inst.pins.push(b);});
  inst.infoEl=infoEl;mapInstances.push(inst);return inst;
 }
 
@@ -1491,7 +1497,42 @@ function chooseDestination(fromPos) {
   S.destBonus = 350 + bestDist * 15;
 }
 
-async function humanChoice(buttons) {
+async /* ===== map centering & on-map fork choice (2026-11-14) ===== */
+let mapChoice = null;
+function centerMapOn(prefIdx){
+ try{
+  const inst=mapInstances[0];if(!inst||!inst.pins[prefIdx])return;
+  const pin=inst.pins[prefIdx];
+  const scroller=pin.closest?pin.closest(".map-scroll"):document.querySelector(".map-scroll");
+  const mapEl=$("japanMap");
+  if(!scroller||!mapEl)return;
+  const pr=pin.getBoundingClientRect(),mr=mapEl.getBoundingClientRect();
+  const cx=pr.left-mr.left+pr.width/2, cy=pr.top-mr.top+pr.height/2;
+  scroller.scrollTo({left:Math.max(0,cx-scroller.clientWidth/2),top:Math.max(0,cy-scroller.clientHeight/2),behavior:"smooth"});
+ }catch(e){/* centering is cosmetic: never break the game */}
+}
+function markChoicePins(choices){
+ mapInstances.forEach(inst=>{choices.forEach(o=>{const pin=inst.pins[o.to];if(pin)pin.classList.add("choice-target");});});
+}
+function clearChoicePins(){
+ mapInstances.forEach(inst=>{inst.pins.forEach(pin=>{if(pin)pin.classList.remove("choice-target");});});
+}
+function handlePinClick(i){
+ if(mapChoice&&mapChoice.targets.has(i)){
+  const r=mapChoice.resolve;mapChoice=null;clearChoicePins();selectPrefOnMap(i);r(i);return;
+ }
+ selectPrefOnMap(i);
+}
+function waitForkChoice(choices){
+ return new Promise(resolve=>{
+  let done=false;
+  const finish=(idx)=>{if(done)return;done=true;mapChoice=null;clearChoicePins();$("actions").innerHTML="";resolve(idx);};
+  mapChoice={targets:new Set(choices.map(o=>o.to)),resolve:(prefIdx)=>{const idx=choices.findIndex(o=>o.to===prefIdx);if(idx>=0)finish(idx);}};
+  markChoicePins(choices);
+  setActions(choices.map((o,i)=>({label:PREFS[o.to].name+(o.edge.type==="road"?"":"（"+o.edge.label+"）"),onClick:()=>finish(i)})));
+ });
+}
+function humanChoice(buttons) {
   return new Promise((resolve) => {
     setActions(buttons.map((b, i) => ({ label: b.label, cls: b.cls, onClick: () => resolve(i) })));
   });
@@ -1530,7 +1571,9 @@ async function movePlayer(pi,steps){
   const choices=forward.length?forward:opts;
   let chosen=choices[0];
   if(choices.length>1&&!pl.cpu){
-   const pick=await humanChoice(choices.map(o=>({label:PREFS[o.to].name+(o.edge.type==="road"?"":"（"+o.edge.label+"）")})));
+   centerMapOn(pl.pos);
+   setMsg(pl.name+" の分かれ道です。光っている行き先の県を地図でタップするか、下のボタンで選んでください（残り "+(steps-step+1)+" マス）");
+   const pick=await waitForkChoice(choices);
    chosen=choices[pick];
   }else if(pl.cpu){
    chosen=choices[Math.floor(Math.random()*choices.length)];
@@ -1538,6 +1581,7 @@ async function movePlayer(pi,steps){
   previous=pl.pos;
   pl.pos=chosen.to;
   renderTokens(pi);renderStatus();renderMaps();
+  centerMapOn(pl.pos);
   const remaining=steps-step;
   setMsg(pl.name+" は "+PREFS[pl.pos].name+(remaining>0?" を通過中（残り "+remaining+" マス）":" に到着") );
   $("diceNote").textContent=pl.name+"："+step+"/"+steps+" マス目";
@@ -1743,7 +1787,7 @@ async function resolveArrival(pi){
  await wait(pl.cpu?350:650);
 }
 async function playTurn(pi){
- const pl=S.players[pi];S.current=pi;renderStatus();
+ const pl=S.players[pi];S.current=pi;renderStatus();centerMapOn(pl.pos);
  if(!pl.cpu){setMsg("あなたの番です。サイコロをタップしてください。");$("diceNote").textContent=pl.name+"の番";showWait("サイコロをタップしてね");await waitDiceClick();$("actions").innerHTML="";}
  else{setMsg(pl.name+"（CPU）の番です…");showWait(pl.name+"の番です");await wait(400);}
  const roll=1+Math.floor(Math.random()*6),dice=$("dice");dice.classList.remove("rolling");void dice.offsetWidth;dice.classList.add("rolling");
