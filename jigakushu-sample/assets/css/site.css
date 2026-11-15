@@ -1,0 +1,17 @@
+/* サイト共通の枠（ヘッダー・フッター）用。見本として新規に用意 */
+.site-header { background:#1a4a20; color:#fff; padding:14px 16px; }
+.site-header .site-title { font-size:20px; font-weight:700; letter-spacing:.1em; }
+.site-header .site-title a { color:#fff; text-decoration:none; }
+.site-nav { margin-top:6px; font-size:13px; }
+.site-nav a { color:#dcebd8; text-decoration:none; margin-right:14px; }
+.site-nav a:hover { text-decoration:underline; }
+.site-footer { text-align:center; color:#5a5a6e; font-size:12px; padding:24px 12px 32px; }
+.sample-note { max-width:800px; margin:12px auto 0; padding:8px 12px; background:#fff8e1; border:1px solid #e0c96a; font-size:12px; color:#5a4a00; }
+.index-main { max-width:800px; margin:0 auto; padding:24px 16px 48px; font-family:'Noto Serif JP',serif; }
+.index-main h2 { font-size:16px; border-bottom:2px solid #1a4a20; padding-bottom:4px; margin:24px 0 10px; }
+.index-main ul { list-style:none; padding:0; }
+.index-main li { margin:6px 0; }
+.index-main a { color:#2a4a7a; }
+/* Bloggerテーマ側にあった画像ラッパー（移管で消える分の補い） */
+.separator { text-align: center; }
+.separator img { max-width: 100%; height: auto; }

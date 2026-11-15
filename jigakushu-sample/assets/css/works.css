@@ -1,0 +1,171 @@
+/* 作品本文用CSS：Blogger記事に重複していた <style>（4,297字）をそのまま切り出したもの。全作品共通 */
+:root {
+    --ink: #1a1208;
+    --paper: #f0eedd;
+    --aged: #e2d8c4;
+    --accent: #2a4a7a;
+    --gold: #c8963e;
+    --muted: #5a5a6e;
+    --header-bg: #1a4a20;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  .book-container {
+    font-family: 'Noto Serif JP', serif;
+    background: #ffffff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 12px 48px;
+    min-height: 100vh;
+  }
+  .book-title {
+    color: #000000;
+    font-size: clamp(11px, 2vw, 13px);
+    letter-spacing: 0.3em;
+    text-align: center;
+    padding: 12px 0 20px;
+    opacity: 0.85;
+  }
+  .slide {
+    width: 100%;
+    max-width: 800px;
+    background: var(--paper);
+    border: 1px solid #ffffff;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+    margin-bottom: 28px;
+    position: relative;
+    overflow: hidden;
+  }
+  .slide-header {
+    background: var(--header-bg);
+    padding: 12px 20px;
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+  }
+  .page-num {
+    font-size: clamp(10px, 1.8vw, 11px);
+    color: #ffffff;
+    letter-spacing: 0.2em;
+    white-space: nowrap;
+  }
+  .scene-title {
+    font-size: clamp(13px, 3vw, 15px);
+    color: #ffffff;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+  }
+  .slide-body { padding: clamp(16px, 4vw, 28px); }
+  .main-text {
+    font-size: clamp(13px, 2.5vw, 15px);
+    line-height: 2.1;
+    color: var(--ink);
+    text-align: justify;
+    letter-spacing: 0.04em;
+  }
+  .main-text p {
+    margin-bottom: 0.5em;
+    text-indent: 1em;
+  }
+  .main-text p.dialog {
+    text-indent: 0;
+    padding-left: 0.6em;
+    border-left: 3px solid rgba(31,90,44,0.25);
+    margin-left: 0.4em;
+    margin-bottom: 0.4em;
+  }
+  ruby rt {
+    font-size: 0.55em;
+    color: var(--accent);
+    letter-spacing: 0;
+  }
+  .slide-footer {
+    background: var(--aged);
+    border-top: 1px solid #b8c4d8;
+    padding: clamp(12px, 3vw, 16px) clamp(16px, 4vw, 24px);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  @media (max-width: 480px) {
+    .slide-footer { grid-template-columns: 1fr; }
+  }
+  .footer-section { font-size: clamp(11px, 2vw, 12px); }
+  .footer-label {
+    font-size: clamp(9px, 1.8vw, 10px);
+    color: var(--muted);
+    letter-spacing: 0.2em;
+    margin-bottom: 5px;
+    display: block;
+  }
+  .vocab-list { display: flex; flex-direction: column; gap: 4px; }
+  .vocab-item { color: var(--ink); line-height: 1.6; }
+  .vocab-item strong { color: var(--accent); margin-right: 4px; }
+  .question-text { color: var(--ink); line-height: 1.75; }
+  .char-bar {
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent), #6a9ad0);
+  }
+  .roudoku-link {
+    width: 100%;
+    max-width: 760px;
+    margin-bottom: 28px;
+    background: var(--header-bg);
+    border: 1px solid #3b7236;
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .roudoku-info { flex: 1; min-width: 180px; }
+  .roudoku-info p {
+    color: #ffffff;
+    font-size: clamp(12px, 2.5vw, 14px);
+    letter-spacing: 0.08em;
+    margin-bottom: 3px;
+  }
+  .roudoku-btn {
+    display: inline-block;
+    background: #c1d4c3;
+    color: #000000;
+    text-decoration: none;
+    padding: 10px 20px;
+    font-family: 'Noto Serif JP', serif;
+    font-size: clamp(12px, 2.2vw, 13px);
+    letter-spacing: 0.1em;
+    border: 1px solid #4aba50;
+    white-space: nowrap;
+  }
+  .support-link {
+    width: 100%;
+    max-width: 760px;
+    margin-bottom: 28px;
+    background: var(--paper);
+    border: 1px solid var(--gold);
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .support-info { flex: 1; min-width: 180px; }
+  .support-info p {
+    color: var(--ink);
+    font-size: clamp(12px, 2.5vw, 14px);
+    letter-spacing: 0.08em;
+    margin-bottom: 3px;
+  }
+  /* 親のクラス名（.support-link）も一緒に並べることで、Bloggerの初期CSSに競り勝ちます */
+  .support-link a.support-btn {
+    display: inline-block;
+    background: var(--header-bg) !important;
+    color: #ffffff !important; /* ← これでBloggerの初期リンク色を強制上書き */
+    text-decoration: none !important;
+    padding: 10px 20px;
+    font-family: 'Noto Serif JP', serif;
+    font-size: clamp(12px, 2.2vw, 13px);
+    letter-spacing: 0.1em;
+    border: 1px solid var(--gold);
+    white-space: nowrap;
+  }

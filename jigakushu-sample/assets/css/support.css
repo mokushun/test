@@ -1,0 +1,205 @@
+/* サポート用CSS：Blogger記事に重複していた <style>（4,572字）をそのまま切り出したもの。全サポート共通 */
+:root {
+    --ink: #1a1208;
+    --aged: #e2d8c4;
+    --gold: #c8963e;
+    --muted: #5a5a6e;
+    --paper: #fafaf7;
+  	--header-bg: #8b1e3f;
+  	--accent: #8b1e3f;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Noto Serif JP', serif;
+    background: #ffffff;
+  }
+  .book-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 12px 48px;
+    min-height: 100vh;
+  }
+  .book-title {
+    color: #000000;
+    font-size: clamp(11px, 2vw, 13px);
+    letter-spacing: 0.3em;
+    text-align: center;
+    padding: 12px 0 20px;
+    opacity: 0.85;
+  }
+  .back-link {
+    width: 100%;
+    max-width: 800px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: flex-start;
+  }
+  .back-link a {
+    color: var(--accent);
+    text-decoration: none;
+    font-size: clamp(12px, 2.2vw, 13px);
+    letter-spacing: 0.1em;
+    border-bottom: 1px solid var(--accent);
+    padding-bottom: 2px;
+  }
+  .slide {
+    width: 100%;
+    max-width: 800px;
+    background: var(--paper);
+    border: 1px solid #ffffff;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+    margin-bottom: 28px;
+    position: relative;
+    overflow: hidden;
+  }
+  .slide-header {
+    background: var(--header-bg);
+    padding: 12px 20px;
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+  }
+  .page-num {
+    font-size: clamp(10px, 1.8vw, 11px);
+    color: #ffffff;
+    letter-spacing: 0.2em;
+    white-space: nowrap;
+  }
+  .scene-title {
+    font-size: clamp(13px, 3vw, 15px);
+    color: #ffffff;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+  }
+  .slide-body { padding: clamp(16px, 4vw, 28px); }
+  .main-text {
+    font-size: clamp(13px, 2.5vw, 15px);
+    line-height: 2.1;
+    color: var(--ink);
+    text-align: justify;
+    letter-spacing: 0.04em;
+  }
+  .main-text p { margin-bottom: 0.7em; }
+  .main-text p:last-child { margin-bottom: 0; }
+
+  /* 作品情報 */
+  .info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px 24px;
+  }
+  @media (max-width: 480px) {
+    .info-grid { grid-template-columns: 1fr; }
+  }
+  .info-item { font-size: clamp(13px, 2.5vw, 14px); }
+  .info-label {
+    font-size: clamp(9px, 1.8vw, 10px);
+    color: var(--muted);
+    letter-spacing: 0.2em;
+    margin-bottom: 4px;
+    display: block;
+  }
+  .info-value { color: var(--ink); line-height: 1.7; }
+
+  /* 登場人物 */
+  .char-card {
+    border-left: 3px solid var(--accent);
+    padding: 10px 0 10px 16px;
+    margin-bottom: 16px;
+  }
+  .char-card:last-child { margin-bottom: 0; }
+  .char-name {
+    font-size: clamp(14px, 2.8vw, 16px);
+    color: var(--accent);
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    margin-bottom: 2px;
+  }
+  .char-role {
+    font-size: clamp(11px, 2vw, 12px);
+    color: var(--gold);
+    letter-spacing: 0.1em;
+    margin-bottom: 6px;
+  }
+  .char-desc {
+    font-size: clamp(13px, 2.3vw, 14px);
+    line-height: 1.85;
+    color: var(--ink);
+  }
+
+  /* テーマ */
+  .theme-card {
+    background: rgba(255,255,255,0.5);
+    border: 1px solid #cbd3c2;
+    padding: 14px 18px;
+    margin-bottom: 14px;
+  }
+  .theme-card:last-child { margin-bottom: 0; }
+  .theme-name {
+    font-size: clamp(13px, 2.6vw, 15px);
+    color: var(--accent);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .theme-name::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    background: var(--gold);
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .theme-desc {
+    font-size: clamp(12.5px, 2.2vw, 13.5px);
+    line-height: 1.85;
+    color: var(--ink);
+  }
+
+  /* 感想文ヒント */
+  .hint-block { margin-bottom: 22px; }
+  .hint-block:last-child { margin-bottom: 0; }
+  .hint-heading {
+    font-size: clamp(12px, 2.2vw, 13px);
+    color: var(--muted);
+    letter-spacing: 0.2em;
+    margin-bottom: 10px;
+    display: block;
+  }
+  .hint-list {
+    list-style: none;
+  }
+  .hint-list li {
+    font-size: clamp(13px, 2.3vw, 14px);
+    line-height: 1.9;
+    color: var(--ink);
+    display: flex;
+    align-items: baseline;
+    margin-bottom: 10px;
+  }
+  .hint-list li:last-child { margin-bottom: 0; }
+  .hint-list-mark {
+    display: inline-block;
+    margin-right: 0.4em;
+    flex-shrink: 0;
+  }
+  .hint-list.q .hint-list-mark {
+    width: 1.2em;
+    color: #ffffff;
+    background: var(--accent);
+    text-align: center;
+    font-size: 0.7em;
+    line-height: 1.6;
+  }
+  .hint-list.p .hint-list-mark {
+    color: var(--gold);
+  }
+
+  .char-bar {
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent), #6a9ad0);
+  }
