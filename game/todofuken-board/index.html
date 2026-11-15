@@ -1116,12 +1116,12 @@ let S = null;
 let selectedPlayerCount = 2;
 let selectedHumanCount = 1;
 function newState(){
- const names=["あなた","さくら","たけし"],colors=["#d23b2e","#2f6fd0","#2e9e62"];
+ const names=selectedHumanCount>1?["プレイヤー1","プレイヤー2","プレイヤー3"]:["あなた","さくら","たけし"],colors=["#d23b2e","#2f6fd0","#2e9e62"];
  const pool = PREFS.map((_,i)=>i);
  for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
  const starts = pool.slice(0,selectedPlayerCount);
  const players = names.slice(0,selectedPlayerCount).map((name,i)=>({
-   name,color:colors[i],initial:name[0],cpu:i>=selectedHumanCount,pos:starts[i],startPref:starts[i],visited:{},cards:0
+   name,color:colors[i],initial:name.startsWith("プレイヤー")?name.slice(-1):name[0],cpu:i>=selectedHumanCount,pos:starts[i],startPref:starts[i],visited:{},cards:0
  }));
  for(let i=players.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[players[i],players[j]]=[players[j],players[i]];}
  const owners={};
