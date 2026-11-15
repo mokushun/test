@@ -798,6 +798,8 @@
 @keyframes justGotPulse { 50%{ transform:scale(1.55) rotate(18deg); filter:drop-shadow(0 0 7px #ffd94d); } }
 @media (prefers-reduced-motion: reduce) { .dice-cube { transition-duration:.25s; } .confetti { display:none; } }
 #resultOverlay .sheet { position:relative; overflow:hidden; }
+.splash-turn { background:linear-gradient(150deg,#2b3a55,#46586e); }
+.len-row button:disabled { opacity:.35; }
 </style>
   </head>
   <body>
@@ -848,7 +850,7 @@
       </section>
 
       <details class="panel props-panel">
-        <summary>あなたの都道府県カード</summary>
+        <summary id="myPropsTitle">あなたの都道府県カード</summary>
         <ul class="myprops" id="myProps"></ul>
       </details>
     </div>
@@ -864,7 +866,9 @@
           <li>空いている県は先着で獲得。他の人の県ではサイコロ勝負（同じ目は防衛の勝ちで、奪えない）</li>
           <li>同じ地方を3県以上所有すると＋3点。各プレイヤー12回ずつ手番を行うと終了</li>
         </ul><h3>プレイ人数</h3><div class="len-row" id="playerCountRow">
-          <button type="button" data-count="2" class="selected">2人</button><button type="button" data-count="3">3人</button></div>
+          <button type="button" data-count="2" class="selected">2人</button><button type="button" data-count="3">3人</button></div><h3>あそびかた</h3><div class="len-row" id="humanCountRow">
+          <button type="button" data-humans="1" class="selected">CPUと対戦</button><button type="button" data-humans="2">2人で交代</button><button type="button" data-humans="3">3人で交代</button></div>
+        <p>交代モードでは、番がきた人の名前が大きく出ます。その人がサイコロをタップしてね。</p>
         <div class="sticky-footer">
           <button type="button" class="primary big-start" id="startBtn">ゲームスタート</button>
         </div>
@@ -1110,13 +1114,14 @@ function renderDice(n) { setDiceFace(n, false); }
 /* ================= state ================= */
 let S = null;
 let selectedPlayerCount = 2;
+let selectedHumanCount = 1;
 function newState(){
  const names=["あなた","さくら","たけし"],colors=["#d23b2e","#2f6fd0","#2e9e62"];
  const pool = PREFS.map((_,i)=>i);
  for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
  const starts = pool.slice(0,selectedPlayerCount);
  const players = names.slice(0,selectedPlayerCount).map((name,i)=>({
-   name,color:colors[i],initial:name[0],cpu:i>0,pos:starts[i],startPref:starts[i],visited:{},cards:0
+   name,color:colors[i],initial:name[0],cpu:i>=selectedHumanCount,pos:starts[i],startPref:starts[i],visited:{},cards:0
  }));
  for(let i=players.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[players[i],players[j]]=[players[j],players[i]];}
  const owners={};
@@ -1214,6 +1219,7 @@ function showSplash(title,sub,kind,ms){
   $("splashSub").textContent=sub||"";
   const inner=sp.querySelector(".splash-inner");
   inner.className="splash-inner splash-"+(kind||"duel");
+  inner.style.borderColor="";
   const fx=$("splashFx");
   if(fx){fx.innerHTML="";
    if(kind==="get"){const colors=["#f4bd4c","#e4572e","#3f7fbf","#43a05a","#ff5b8d","#ffffff"];
@@ -1266,7 +1272,8 @@ function showCardPopup(k,title){
 }
 function renderMyProps(){
  const ul=$("myProps");ul.innerHTML="";
- const hi=humanIndex();
+ const hi=(S.current>=0&&S.players[S.current]&&!S.players[S.current].cpu)?S.current:humanIndex();
+ const title=$("myPropsTitle");if(title&&S.players[hi])title.textContent=S.players[hi].name+" の都道府県カード";
  const keys=Object.keys(S.owners).filter(k=>S.owners[k]===hi).map(Number).sort((a,b)=>a-b);
  if(!keys.length){ul.classList.remove("tcard-grid");ul.innerHTML='<li class="empty-note">まだカードを持っていません。</li>';return;}
  ul.classList.toggle("tcard-grid", keys.some(k=>cardOf(k)));
@@ -1550,17 +1557,32 @@ async function resolveArrival(pi){
   const defBefore=regionCountOf(owner,regKey);
   setMsg(pl.name+" が "+p.name+" に到着！所有者 "+defender.name+" と対決！");
   let attack,defense;
-  if(!pl.cpu){
+  if(!pl.cpu&&!defender.cpu){
+   await showSplash("⚔️ 対決！",pl.name+" VS "+defender.name+"｜"+p.name+" をかけた対決！","duel",1100);
+   await waitDiceClick(defender.name+" の防衛ロール",defender.name+"、サイコロをタップして防衛！");
+   $("actions").innerHTML="";
+   defense=await rollDiceAnimated();
+   $("diceNote").textContent=defender.name+" の防衛："+defense;
+   await wait(1100);hideDice();
+   const needA2=defense+1;
+   const targetA2=needA2<=6?(pl.name+" は "+needA2+" 以上で勝ち！"):("相手は "+defense+"。"+needA2+" 以上の目は出ないので今回は奪えないけど、振ってみよう");
+   setMsg("対決！ "+targetA2);
+   await waitDiceClick(pl.name+" の攻撃ロール",defender.name+" の防衛は "+defense+"。"+targetA2);
+   $("actions").innerHTML="";
+   attack=await rollDiceAnimated();
+   $("diceNote").textContent=pl.name+"："+attack+" ／ "+defender.name+"："+defense;
+   await wait(1300);hideDice();
+  }else if(!pl.cpu){
    await showSplash("⚔️ 対決！",pl.name+" VS "+defender.name+"｜"+p.name+" をかけた対決！","duel",1100);
    showDice("相手の防衛ロール");
    defense=await rollDiceAnimated();
    $("diceNote").textContent=defender.name+" の防衛："+defense;
    await wait(900);
    const needA=defense+1;
-   const targetA=needA<=6?("あなたは "+needA+" 以上で勝ち！"):("相手は合計 "+defense+"。"+needA+" 以上の目は出ないので今回は奪えないけど、振ってみよう");
+   const targetA=needA<=6?(pl.name+" は "+needA+" 以上で勝ち！"):("相手は合計 "+defense+"。"+needA+" 以上の目は出ないので今回は奪えないけど、振ってみよう");
    setMsg("対決！ "+targetA);
    showWait("サイコロをタップして対決！");
-   await waitDiceClick("あなたの攻撃ロール",defender.name+" の防衛は "+defense+"。"+targetA);
+   await waitDiceClick(pl.name+" の攻撃ロール",defender.name+" の防衛は "+defense+"。"+targetA);
    $("actions").innerHTML="";
    attack=await rollDiceAnimated();
    $("diceNote").textContent=pl.name+"："+attack+" ／ "+defender.name+"："+defense;
@@ -1576,7 +1598,7 @@ async function resolveArrival(pi){
    const targetD=needD<=1?"どの目を出しても守れるよ（同点は防衛の勝ち）":(needD+" 以上の目で守れる！（同点は防衛の勝ち）");
    setMsg("防衛の番です。"+targetD);
    showWait("サイコロをタップして防衛！");
-   await waitDiceClick("あなたの防衛ロール",pl.name+" の攻撃は "+attack+"。"+targetD);
+   await waitDiceClick(defender.name+" の防衛ロール",pl.name+" の攻撃は "+attack+"。"+targetD);
    $("actions").innerHTML="";
    defense=await rollDiceAnimated();
    $("diceNote").textContent=pl.name+"："+attack+" ／ "+defender.name+"："+defense;
@@ -1621,7 +1643,9 @@ async function resolveArrival(pi){
 }
 async function playTurn(pi){
  const pl=S.players[pi];S.current=pi;renderStatus();centerMapOn(pl.pos);
- if(!pl.cpu){setMsg("あなたの番です。サイコロをタップしてください。");$("diceNote").textContent=pl.name+"の番";showWait("サイコロをタップしてね");await waitDiceClick("あなたの番！ サイコロをタップ");$("actions").innerHTML="";}
+ if(!pl.cpu){setMsg(pl.name+" の番です。サイコロをタップしてください。");$("diceNote").textContent=pl.name+"の番";
+  if(S.players.filter(p=>!p.cpu).length>1){const pr=showSplash("🎲 "+pl.name+" の番！",pl.name+"、サイコロをタップしてね","turn",900);const inner=document.querySelector(".splash-inner");if(inner)inner.style.borderColor=pl.color;await pr;}
+  showWait("サイコロをタップしてね");await waitDiceClick(pl.name+" の番！ サイコロをタップ");$("actions").innerHTML="";}
  else{setMsg(pl.name+"（CPU）の番です…");showWait(pl.name+"の番です");showDice(pl.name+" の番");await wait(400);}
  const roll=await rollDiceAnimated();$("diceNote").textContent=pl.name+"："+roll+" が出た";
  log(pl.name+" は "+roll+" マス進みます");if(!pl.cpu){await wait(1000);hideDice();}else{await wait(800);hideDice();}
@@ -1671,7 +1695,10 @@ S = newState();
 renderAll();
 renderDice(1);
 
-$("playerCountRow").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{selectedPlayerCount=+b.dataset.count;$("playerCountRow").querySelectorAll("button").forEach(x=>x.classList.toggle("selected",x===b));}));
+$("playerCountRow").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{selectedPlayerCount=+b.dataset.count;$("playerCountRow").querySelectorAll("button").forEach(x=>x.classList.toggle("selected",x===b));refreshHumanRow();}));
+function refreshHumanRow(){if(selectedHumanCount>selectedPlayerCount)selectedHumanCount=selectedPlayerCount;$("humanCountRow").querySelectorAll("button").forEach(x=>{const h=+x.dataset.humans;x.disabled=h>selectedPlayerCount;x.classList.toggle("selected",h===selectedHumanCount);});}
+$("humanCountRow").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{selectedHumanCount=+b.dataset.humans;refreshHumanRow();}));
+refreshHumanRow();
 $("startBtn").addEventListener("click", () => {
   if (gameRunning) return;
   gameRunning = true;
